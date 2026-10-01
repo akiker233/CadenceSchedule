@@ -1,0 +1,242 @@
+name: Build Release APK
+
+# 触发方式：
+#   1. 推送 v* 标签（约定：标签必须严格等于 v + app/build.gradle.kts 的 versionName）
+#   2. 手动触发（workflow_dispatch）
+#
+# 项目自 2026-08-25 起删除了旧的 Build APK workflow（提交信息：Remove failing Build APK workflow）。
+# 失败根因是旧流程没有安装 Android SDK，而项目已使用 compileSdk = 37，
+# runner 预装的 SDK 里没有该平台。本流程显式安装所需 SDK 组件。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # 配置缓存与并行在 CI 上收益有限、且会放大偶发失败，这里显式关闭
+  GRADLE_OPTS: >-
+    -Dorg.gradle.configuration-cache=false
+    -Dorg.gradle.parallel=false
+    -Dorg.gradle.jvmargs=-Xmx4g
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 项目用 AGP 9.2.1 + Gradle 9.5.1，需要 JDK 17 以上；本机验证用的是 Temurin 21
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # compileSdk / targetSdk 为 37，必须显式安装，否则 aapt2 与 android.jar 都找不到
+      - name: Install Android SDK components
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37 build-tools;37.0.0 platform-tools'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Read version from build script
+        id: version
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::未能从 app/build.gradle.kts 读取 versionName"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "应用版本号: $VERSION"
+
+      # 标签与版本号不一致会导致发布物与更新器判断的版本错位，直接失败
+      - name: Verify tag matches versionName
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          EXPECTED="v${{ steps.version.outputs.version }}"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "::error::标签 $TAG 与 versionName 不一致，应为 $EXPECTED"
+            exit 1
+          fi
+          echo "标签校验通过: $TAG"
+
+      # 发布说明从 ChangelogData.kt 提取。旧流程匹配不到时静默写入 "Release update"，
+      # 导致发布说明随机漂移；这里改为直接失败，强制先补齐 changelog。
+      - name: Extract release notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          python3 - "$VERSION" <<'PY'
+          import re, sys, pathlib
+
+          def fail(message):
+              # GitHub 注解必须走 stdout 且以非零码退出，不能依赖 sys.exit(str) 的 traceback
+              print(f"::error::{message}")
+              sys.exit(1)
+
+          version = sys.argv[1]
+          changelog = pathlib.Path("app/src/main/java/com/haooz/chedule/ui/data/ChangelogData.kt")
+          if not changelog.is_file():
+              fail("找不到 ChangelogData.kt")
+          src = changelog.read_text(encoding="utf-8")
+
+          # 取 version = "v<version>" 之后、紧跟的 changes = listOf( ... ) 块
+          pattern = re.compile(
+              r'ChangelogEntry\(\s*version\s*=\s*"v' + re.escape(version) + r'"',
+              re.DOTALL,
+          )
+          entry = pattern.search(src)
+          if not entry:
+              fail(
+                  f"ChangelogData.kt 中没有版本 v{version} 的条目。"
+                  f"请先添加 changelog（版本号必须与 build.gradle.kts 的 versionName 完全一致），再打标签发布。"
+              )
+
+          tail = src[entry.end():]
+          changes = re.search(r'changes\s*=\s*listOf\((.*?)\)', tail, re.DOTALL)
+          if not changes:
+              fail(f"版本 v{version} 的 changelog 缺少 changes = listOf(...) 块")
+
+          items = re.findall(r'"((?:[^"\\]|\\.)*)"', changes.group(1))
+          if not items:
+              fail(f"版本 v{version} 的 changelog 条目为空")
+
+          lines = [f"## v{version}", ""] + [f"- {i}" for i in items] + [""]
+          pathlib.Path("RELEASE_NOTE.md").write_text("\n".join(lines), encoding="utf-8")
+          print(f"已从 changelog 提取 {len(items)} 条更新说明")
+          PY
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Write signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NEXIO_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::未配置 NEXIO_KEYSTORE_BASE64，本次产物将是未签名 APK（用户无法直接安装）"
+            exit 0
+          fi
+          KEYSTORE="$RUNNER_TEMP/nexio-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+          echo "NEXIO_KEYSTORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "已写入签名库到 runner 临时目录"
+
+      # 同时把期望指纹注入 BuildConfig：App 更新校验会优先使用它，
+      # 从而具备对更新源（而非仅"与当前安装包比对"）的防伪能力。
+      - name: Build release APK
+        env:
+          NEXIO_KEYSTORE_PASSWORD: ${{ secrets.NEXIO_KEYSTORE_PASSWORD }}
+          NEXIO_KEY_ALIAS: ${{ secrets.NEXIO_KEY_ALIAS }}
+          NEXIO_KEY_PASSWORD: ${{ secrets.NEXIO_KEY_PASSWORD }}
+        run: |
+          EXPECTED="${{ secrets.NEXIO_EXPECTED_SIGNER_SHA256 }}"
+          if [ -n "$EXPECTED" ]; then
+            ./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256="$EXPECTED" --stacktrace
+          else
+            ./gradlew :app:assembleRelease --stacktrace
+          fi
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::未找到 release APK 产物"
+            exit 1
+          fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          case "$APK" in
+            *unsigned*) echo "::warning::产物是未签名 APK（未提供签名 secrets），用户无法直接安装" ;;
+          esac
+          ls -lh "$APK"
+
+      # 签名指纹必须与 App 内置的 BuildConfig.EXPECTED_SIGNER_SHA256 一致。
+      # 二者不一致会造成两类事故：更新包被判为签名非法而拒绝安装；
+      # 或（若未配置属性）校验退化为"与当前安装包比对"，失去对更新源的防伪能力。
+      - name: Verify APK signature
+        env:
+          EXPECTED_SHA256: ${{ secrets.NEXIO_EXPECTED_SIGNER_SHA256 }}
+        run: |
+          APK="${{ steps.apk.outputs.path }}"
+
+          if [[ "$APK" == *unsigned* ]]; then
+            echo "::warning::跳过签名校验（未签名产物）"
+            exit 0
+          fi
+
+          # 用当前应用自带的 apksigner，避免与 SDK 版本耦合
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          echo "使用: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
+
+          ACTUAL=$(grep -i 'certificate SHA-256 digest' /tmp/certs.txt | head -1 | awk -F': ' '{print $2}' | tr -d ':' | tr 'a-f' 'A-F')
+          if [ -z "$ACTUAL" ]; then
+            echo "::error::未能从 apksigner 输出解析签名指纹"
+            exit 1
+          fi
+          echo "APK 签名指纹: $ACTUAL"
+
+          if [ -z "$EXPECTED_SHA256" ]; then
+            echo "::warning::未配置 NEXIO_EXPECTED_SIGNER_SHA256，跳过指纹对账。"
+            echo "::warning::建议配置该 secret，并在构建时以 -Pnexio.expectedSignerSha256 注入，"
+            echo "::warning::否则 App 内的更新校验只能退化为『与当前安装包同签名』。"
+            exit 0
+          fi
+
+          EXPECTED=$(echo "$EXPECTED_SHA256" | tr -d ':' | tr 'a-f' 'A-F')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::签名指纹与期望值不一致，请勿发布"
+            echo "  实际: $ACTUAL"
+            echo "  期望: $EXPECTED"
+            exit 1
+          fi
+          echo "签名指纹对账通过"
+
+      - name: Generate checksums
+        run: |
+          APK="${{ steps.apk.outputs.path }}"
+          SHA=$(sha256sum "$APK" | awk '{print $1}')
+          echo "APK SHA-256: $SHA"
+          echo "$SHA  $(basename "$APK")" > "$APK.sha256"
+          {
+            echo ""
+            echo "## 安装包校验"
+            echo ""
+            echo '```'
+            echo "SHA-256: $SHA"
+            echo '```'
+          } >> RELEASE_NOTE.md
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexio-release-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.apk.outputs.path }}
+            ${{ steps.apk.outputs.path }}.sha256
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.apk.outputs.path }}
+            ${{ steps.apk.outputs.path }}.sha256
+          body_path: RELEASE_NOTE.md
+          name: "Nexio课程表 v${{ steps.version.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -150,6 +150,66 @@ app/src/main/java/com/haooz/chedule/
 - **脚本引擎**: Rhino (JavaScript)
 - **最低支持**: Android 12 (API 31)
 
+## 开发与发布
+
+### 单元测试
+
+```bash
+./gradlew :app:testDebugUnitTest
+```
+
+覆盖数据层的纯逻辑（节次时间合并、更新通道的版本单调性与签名指纹比对、教务索引处置策略）。
+不需要模拟器，也不依赖 Robolectric。
+
+### 版本号规范
+
+版本号只有一个来源：`app/build.gradle.kts` 的 `versionName`。打标签时必须**严格等于** `v` + `versionName`：
+
+| 位置 | 取值 | 说明 |
+|------|------|------|
+| `app/build.gradle.kts` → `versionName` | `1.6.0.2-0928` | 唯一来源 |
+| Git 标签 | `v1.6.0.2-0928` | 必须完全一致，否则 CI 直接失败 |
+| `ChangelogData.kt` → `ChangelogEntry(version = ...)` | `v1.6.0.2-0928` | **必须存在对应条目**，否则 CI 拒绝发布 |
+
+> 历史上 changelog 用过三段式（如 `v1.6.0-0924`）而 `versionName` 用四段式（如 `1.6.0.2-0928`），
+> 导致自动提取更新日志时常匹配不到。现在 CI 会强制校验，缺条目即失败，不再静默降级成 "Release update"。
+
+### 发布流程
+
+推送形如 `v1.6.0.2-0928` 的标签即可触发 `.github/workflows/build.yml`：安装 SDK → 跑单元测试 →
+拉取内置教务索引 → 构建 release APK → 校验签名指纹 → 生成 SHA-256 校验文件 → 发布到 GitHub Release。
+
+需要在仓库 Secrets 中配置（缺少时产物为未签名 APK，仅作构建验证用）：
+
+| Secret | 说明 |
+|--------|------|
+| `NEXIO_KEYSTORE_BASE64` | 签名库文件的 Base64（`base64 -w0 release.jks`） |
+| `NEXIO_KEYSTORE_PASSWORD` | 签名库口令 |
+| `NEXIO_KEY_ALIAS` | key alias |
+| `NEXIO_KEY_PASSWORD` | key 口令 |
+| `NEXIO_EXPECTED_SIGNER_SHA256` | 签名证书 SHA-256 指纹（大写十六进制，可带冒号） |
+
+最后一项会同时用于两处：**注入 App 的 `BuildConfig.EXPECTED_SIGNER_SHA256`**（更新包签名校验的期望值），
+以及 **CI 中与产物实际指纹对账**。二者不一致会导致 App 拒绝安装自己发布的更新包。
+
+本地构建签名版本：
+
+```bash
+NEXIO_KEYSTORE_FILE=/path/to/release.jks \
+NEXIO_KEYSTORE_PASSWORD=*** \
+NEXIO_KEY_ALIAS=*** \
+NEXIO_KEY_PASSWORD=*** \
+./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256=<指纹>
+```
+
+### 教务索引内置文件
+
+`app/src/main/assets/eduloader/school_index.pb` 不进版本控制（约 72KB），由 Release 构建自动处理：
+
+- 文件已存在且大小合理 → 直接复用，不联网；
+- 文件缺失 → 从 Gitee 拉取；
+- 缺失且拉取失败 → **构建失败**（否则产出的 APK 首启进入教务导入只会看到空白学校列表，且不报错）。
+
 ## 特别致谢
 
 | 项目 | 作者 |
