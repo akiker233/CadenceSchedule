@@ -7,6 +7,19 @@ data class ChangelogEntry(
 )
 val changelogData = listOf(
     ChangelogEntry(
+        version = "v1.6.0.2-0928",
+        date = "2026-10-01",
+        changes = listOf(
+            "新增更新包签名校验：下载与安装前均核对签名，拒绝来路不明的更新包",
+            "更新不再允许降级安装",
+            "修复部分节次配置下课表作息时间显示错位的问题",
+            "修复课程表数据异常时可能被空课表覆盖、导致课程丢失的问题",
+            "WebDAV 密码与设备标识不再随系统备份上传",
+            "开机、应用更新或调整时间后，提醒闹钟的重排更可靠",
+            "优化课表文件夹在混淆开启后的兼容性",
+        )
+    ),
+    ChangelogEntry(
         version = "v1.6.0-0924",
         date = "2026-09-24",
         changes = listOf(
