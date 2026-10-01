@@ -320,7 +320,7 @@
                 fillColor="@course_color_1" cornerRadiusExp="16" cornerRadius="16" visibility="le(2,#today_count)" />
         </Group>
 
-        <!-- 点击 → 打开 Nexio 课程表 -->
+        <!-- 点击 → 打开 律动课表 -->
         <Button x="0" y="0" w="#view_width" h="#view_height" contentDescriptionExp="@state_title+' '+num(#today_count)+' 节'">
             <Triggers>
                 <Trigger action="up" condition="!eqs(@isPreviewMode,'true')">
