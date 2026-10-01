@@ -19,6 +19,20 @@ class CourseRepository private constructor(context: Context) {
     private val gson = Gson()
 
     private val courseCache = mutableMapOf<String, List<Course>>()
+
+    /**
+     * 解析失败的课表 ID。用于**阻止坏数据被静默覆盖**：
+     * 原实现把解析失败当作"空课表"（返回 emptyList），用户随后任何一次编辑都会走到
+     * [saveCourses] 把原始 JSON 覆盖成空表，课表彻底丢失且无法从本地恢复。
+     * 现在失败会被登记，写入前拦截并抛错，原始串留在盘上等备份恢复。
+     */
+    private val corruptCourseData = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<String, Boolean>(),
+    )
+
+    /** 课表 JSON 损坏且尚未被用户处理时抛出，避免后续写入抹掉可恢复的原始数据 */
+    class CorruptCourseDataException(scheduleId: String) :
+        IllegalStateException("课表「$scheduleId」数据损坏，已阻止覆盖写入以免丢失原始数据，请从备份恢复")
     private val occupiedWeeksCache = mutableMapOf<String, Set<Int>>()
     // getPeriodTimes 等高频路径的配置缓存
     private val timeConfigCache = mutableMapOf<Long, TimeConfig>()
@@ -313,16 +327,9 @@ class CourseRepository private constructor(context: Context) {
         courseCache[scheduleId]?.let { return it }
         val key = "$SCHEDULE_KEY_PREFIX${scheduleId}_$KEY_COURSES"
         val json = prefs.getString(key, null) ?: return emptyList()
-        // 坏 JSON 按真名读会得到空壳课，不当成有效课表，保留原数据供备份恢复
-        if (!coursesJsonLooksValid(json)) return emptyList()
-        val type = object : TypeToken<List<Course>>() {}.type
-        return try {
-            val courses = sanitizeCourses(gson.fromJson(json, type) ?: emptyList())
-            courseCache[scheduleId] = courses
-            courses
-        } catch (_: Exception) {
-            emptyList()
-        }
+        val courses = parseCoursesOrMarkCorrupt(json, scheduleId)
+        courseCache[scheduleId] = courses
+        return courses
     }
 
     fun getScheduleSummary(scheduleId: String): String {
@@ -353,12 +360,43 @@ class CourseRepository private constructor(context: Context) {
         "USELESS_ELVIS",
         "NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS"
     )
-    /** 任一稳定字段名出现即可；坏 JSON 判为无课，避免被当成空课表静默覆盖 */
-    private fun coursesJsonLooksValid(json: String): Boolean {
-        return json.contains("\"name\"") ||
-            json.contains("\"dayOfWeek\"") ||
-            json.contains("\"startSection\"") ||
-            json.contains("\"id\"")
+    /**
+     * 结构校验：必须是 JSON 数组，且每个元素都是对象。
+     *
+     * 旧实现只是 `json.contains("\"id\"")` 之类的字符串匹配——被截断的 JSON 极易通过，
+     * 随后反序列化抛异常又被吞成空表，直接导致用户课表被覆盖。改为真正解析结构。
+     */
+    private fun coursesJsonStructureLooksValid(json: String): Boolean {
+        val element = runCatching {
+            com.google.gson.JsonParser.parseString(json)
+        }.getOrNull() ?: return false
+        if (!element.isJsonArray) return false
+        val array = element.asJsonArray
+        if (array.size() == 0) return true
+        return array.all { it.isJsonObject }
+    }
+
+    /**
+     * 解析课表 JSON。任何失败路径都会把该课表登记为损坏并返回空表，
+     * 由 [saveCourses] 在写入前拦截，保证原始串不会被空表覆盖。
+     */
+    private fun parseCoursesOrMarkCorrupt(json: String, scheduleId: String): List<Course> {
+        if (!coursesJsonStructureLooksValid(json)) {
+            corruptCourseData.add(scheduleId)
+            android.util.Log.e(
+                "CourseRepository",
+                "课表 $scheduleId 的 JSON 结构非法，已阻止覆盖写入（原始长度=${json.length}）",
+            )
+            return emptyList()
+        }
+        return try {
+            val type = object : TypeToken<List<Course>>() {}.type
+            sanitizeCourses(gson.fromJson(json, type) ?: emptyList())
+        } catch (e: Exception) {
+            corruptCourseData.add(scheduleId)
+            android.util.Log.e("CourseRepository", "课表 $scheduleId 反序列化失败，已阻止覆盖写入", e)
+            emptyList()
+        }
     }
 
     /** UnsafeAllocator 使旧 JSON 缺失字段为 null，无条件重建以拿到默认值 */
@@ -391,20 +429,16 @@ class CourseRepository private constructor(context: Context) {
         courseCache[scheduleId]?.let { return it }
         val key = "${getScheduleKeyPrefix()}$KEY_COURSES"
         val json = prefs.getString(key, null) ?: return emptyList()
-        if (!coursesJsonLooksValid(json)) return emptyList()
-        val type = object : TypeToken<List<Course>>() {}.type
-        return try {
-            val courses = sanitizeCourses(gson.fromJson(json, type) ?: emptyList())
-            courseCache[scheduleId] = courses
+        return parseCoursesOrMarkCorrupt(json, scheduleId).also {
+            courseCache[scheduleId] = it
             // 不预热 occupiedWeeksCache：仅编辑选周时用到，按需算即可，冷路径对首屏是白烧
-            courses
-        } catch (_: Exception) {
-            emptyList()
         }
     }
 
     fun saveCourses(courses: List<Course>, notify: Boolean = true) {
         val scheduleId = getCurrentScheduleId()
+        // 损坏态下拒绝写入：原始 JSON 留在盘上，用户仍可从备份恢复，而不是被空表抹掉
+        if (scheduleId in corruptCourseData) throw CorruptCourseDataException(scheduleId)
         val key = "${getScheduleKeyPrefix()}$KEY_COURSES"
         val json = gson.toJson(courses)
         prefs.edit { putString(key, json) }
@@ -491,19 +525,8 @@ class CourseRepository private constructor(context: Context) {
         )
     }
 
-    /** selectedWeeks 为空时按 start/end/weekType 推导 */
-    private fun resolveSelectedWeeks(course: Course): List<Int> {
-        if (course.selectedWeeks.isNotEmpty()) return course.selectedWeeks
-        val weeks = mutableListOf<Int>()
-        for (w in course.startWeek..course.endWeek) {
-            when (course.weekType) {
-                Course.WEEK_TYPE_ODD -> if (w % 2 == 1) weeks.add(w)
-                Course.WEEK_TYPE_EVEN -> if (w % 2 == 0) weeks.add(w)
-                else -> weeks.add(w)
-            }
-        }
-        return weeks
-    }
+    /** selectedWeeks 为空时按 start/end/weekType 推导。语义见 [Course.discreteWeeksIn] */
+    private fun resolveSelectedWeeks(course: Course): List<Int> = course.discreteWeeksIn()
 
     /** 同源（名/教室/教师/位置相同）用于调课时合并周次而非新建重复课程 */
     private fun isSameCourseIdentity(a: Course, b: Course): Boolean {
@@ -1042,11 +1065,18 @@ class CourseRepository private constructor(context: Context) {
     fun getSectionTimes(scheduleId: String): Map<Int, String> {
         val morningCount = getMorningSections(scheduleId)
         val afternoonCount = getAfternoonSections(scheduleId)
-        return buildMap {
-            getPeriodTimes("morning", scheduleId).forEach { (index, time) -> put(index, time) }
-            getPeriodTimes("afternoon", scheduleId).forEach { (index, time) -> put(morningCount + index, time) }
-            getPeriodTimes("evening", scheduleId).forEach { (index, time) -> put(morningCount + afternoonCount + index, time) }
-        }
+        val eveningCount = getEveningSections(scheduleId)
+        return TimeConfig.mergeSectionTimes(
+            morning = TimeConfig.defaultTimesFor("morning", morningCount) +
+                getPeriodTimes("morning", scheduleId),
+            afternoon = TimeConfig.defaultTimesFor("afternoon", afternoonCount) +
+                getPeriodTimes("afternoon", scheduleId),
+            evening = TimeConfig.defaultTimesFor("evening", eveningCount) +
+                getPeriodTimes("evening", scheduleId),
+            morningCount = morningCount,
+            afternoonCount = afternoonCount,
+            eveningCount = eveningCount,
+        )
     }
 
     fun savePeriodTimes(period: String, times: Map<Int, String>) {
@@ -1288,32 +1318,31 @@ class CourseRepository private constructor(context: Context) {
     /** 上午原编号，下午/晚上按节数偏移后的全局绝对节次映射 */
     private fun getGlobalSectionTimes(): Map<Int, String> {
         globalSectionTimesCache?.let { return it }
-        val morning = getPeriodTimes("morning")
-        val afternoon = getPeriodTimes("afternoon")
-        val evening = getPeriodTimes("evening")
-        val morningSections = getMorningSections()
-        val afternoonSections = getAfternoonSections()
-        val times = buildMap {
-            morning.forEach { (k, v) -> put(k, v) }
-            afternoon.forEach { (k, v) -> put(morningSections + k, v) }
-            evening.forEach { (k, v) -> put(morningSections + afternoonSections + k, v) }
-        }
+        val morningCount = getMorningSections()
+        val afternoonCount = getAfternoonSections()
+        val eveningCount = getEveningSections()
+        // 默认值与用户配置一并合并：配置过的时段覆盖默认，任意一段节次为 0 时不会撞键覆盖；
+        // 未被配置的时段用「按该段节数截取」的默认表，避免默认 4 节表张冠李戴。
+        val times = TimeConfig.mergeSectionTimes(
+            morning = TimeConfig.defaultTimesFor("morning", morningCount) + getPeriodTimes("morning"),
+            afternoon = TimeConfig.defaultTimesFor("afternoon", afternoonCount) + getPeriodTimes("afternoon"),
+            evening = TimeConfig.defaultTimesFor("evening", eveningCount) + getPeriodTimes("evening"),
+            morningCount = morningCount,
+            afternoonCount = afternoonCount,
+            eveningCount = eveningCount,
+        )
         globalSectionTimesCache = times
         return times
     }
 
+    /**
+     * 把课程占用的周次并入 [occupied]。
+     *
+     * 与 [resolveSelectedWeeks] 共用 [Course.discreteWeeksIn]：两者结果必须一致，
+     * 否则"调课提示的冲突周"与"实际占用周"会对不上。
+     */
     private fun addCourseWeeks(occupied: MutableSet<Int>, course: Course) {
-        if (course.selectedWeeks.isNotEmpty()) {
-            occupied.addAll(course.selectedWeeks)
-        } else {
-            for (week in course.startWeek..course.endWeek) {
-                when (course.weekType) {
-                    Course.WEEK_TYPE_ODD -> if (week % 2 == 1) occupied.add(week)
-                    Course.WEEK_TYPE_EVEN -> if (week % 2 == 0) occupied.add(week)
-                    else -> occupied.add(week)
-                }
-            }
-        }
+        occupied.addAll(course.discreteWeeksIn())
     }
 
     /**
@@ -1556,7 +1585,7 @@ class CourseRepository private constructor(context: Context) {
                             is String -> {
                                 if (suffix == KEY_COURSES) {
                                     // 坏 JSON 不能 sanitize 后写回，否则变成空壳课并永久盖掉原数据
-                                    if (!coursesJsonLooksValid(value)) {
+                                    if (!coursesJsonStructureLooksValid(value)) {
                                         putString(newKey, value)
                                     } else {
                                         val type = object : TypeToken<List<Course>>() {}.type

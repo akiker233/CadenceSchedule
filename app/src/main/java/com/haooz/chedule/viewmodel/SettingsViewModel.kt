@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.haooz.chedule.data.Course
 import com.haooz.chedule.data.CourseRepository
+import com.haooz.chedule.data.TimeConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -157,13 +158,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // 兼容：合并各时段相对节次为全局绝对编号（下午偏移上午节数，晚上偏移上午+下午）
+    // 合并语义统一走 TimeConfig.mergeSectionTimes，避免任一段节次为 0 时撞键覆盖
     val sectionTimes: StateFlow<Map<Int, String>> = run {
-        val combined = combine(_morningTimes, _afternoonTimes, _eveningTimes, _morningSections, _afternoonSections) { m, a, e, ms, as_ ->
-            buildMap {
-                m.forEach { (k, v) -> put(k, v) }
-                a.forEach { (k, v) -> put(ms + k, v) }
-                e.forEach { (k, v) -> put(ms + as_ + k, v) }
-            }
+        // combine 的类型化重载最多 5 个 Flow，6 个会落到 Array<Any> 版本，需显式取类型
+        val combined = combine(
+            _morningTimes,
+            _afternoonTimes,
+            _eveningTimes,
+            _morningSections,
+            _afternoonSections,
+            _eveningSections,
+        ) { values ->
+            @Suppress("UNCHECKED_CAST")
+            TimeConfig.mergeSectionTimes(
+                morning = values[0] as Map<Int, String>,
+                afternoon = values[1] as Map<Int, String>,
+                evening = values[2] as Map<Int, String>,
+                morningCount = values[3] as Int,
+                afternoonCount = values[4] as Int,
+                eveningCount = values[5] as Int,
+            )
         }
         MutableStateFlow(Course.defaultSectionTimes).also { flow ->
             viewModelScope.launch { combined.collect { flow.value = it } }

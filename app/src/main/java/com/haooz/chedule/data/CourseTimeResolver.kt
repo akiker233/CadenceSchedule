@@ -44,11 +44,11 @@ object CourseTimeResolver {
                 eveningTimes to (section - morningSections - afternoonSections)
         }
         val range = timeMap[relativeSection] ?: return null
-        // 同一节次对应 "HH:mm-HH:mm"，起始/结束按 isEnd 取左/右
+        // 同一节次对应 "HH:mm-HH:mm"，起止解析统一走 CourseSectionTime，避免多处各自切分产生分歧
         return if (isEnd) {
-            range.substringAfter("-", range).trim().ifEmpty { null }
+            CourseSectionTime.end(range)
         } else {
-            range.substringBefore("-").trim().ifEmpty { null }
+            CourseSectionTime.start(range)
         }
     }
 }

@@ -30,6 +30,15 @@ server/
 # --- Gradle 包装器缓存 ---
 .gradle/
 
+# --- 工作区本地 Gradle 缓存（沙箱/受限环境下用 GRADLE_USER_HOME 指向此处）---
+.gradle-dev/
+
+# --- DSH 工作区权限修复的备份与报告 ---
+.dsh-acl-recovery/
+
+# --- 受限环境专用的 Gradle 初始化脚本（本机验证用，非项目配置）---
+gradle-dev-init.gradle.kts
+
 # --- 其他 ---
 /captures
 .externalNativeBuild

@@ -141,12 +141,15 @@ data class TimeConfig(
         val morningTimes = calculatePeriodTimes("morning")
         val afternoonTimes = calculatePeriodTimes("afternoon")
         val eveningTimes = calculatePeriodTimes("evening")
-
-        val result = mutableMapOf<Int, String>()
-        morningTimes.forEach { (k, v) -> result[k] = v }
-        afternoonTimes.forEach { (k, v) -> result[morningSections + k] = v }
-        eveningTimes.forEach { (k, v) -> result[morningSections + afternoonSections + k] = v }
-        return result
+        // 统一走合并函数：任意一段节次为 0 时不再把相对节次号直接相加造成撞键覆盖
+        return mergeSectionTimes(
+            morning = morningTimes,
+            afternoon = afternoonTimes,
+            evening = eveningTimes,
+            morningCount = morningSections,
+            afternoonCount = afternoonSections,
+            eveningCount = eveningSections,
+        )
     }
 
     private fun calculatePeriodTimes(period: String): Map<Int, String> {
@@ -190,6 +193,87 @@ data class TimeConfig(
     }
 
     companion object {
+        /**
+         * 把时段内相对节次号整体后移 [offset]，得到全局绝对节次号。
+         *
+         * [offset] 为 [NO_SECTION_OFFSET] 时返回空表：代表"该时段没有节次"，
+         * **不能**用 0 代替——0 会让下午的相对第 1 节落到全局第 1 节，与上午第 1 节撞键，
+         * 合并时互相覆盖，表现为作息时间静默错位。
+         */
+        fun shiftSectionKeys(times: Map<Int, String>, offset: Int): Map<Int, String> {
+            if (offset == NO_SECTION_OFFSET || times.isEmpty()) return emptyMap()
+            return times.entries.associate { (index, time) -> (offset + index) to time }
+        }
+
+        /**
+         * 合并三段作息为全局绝对节次表。
+         *
+         * 每段只在**自身节数 > 0** 时放入，并整体后移到自己的全局区间：
+         * 上午占 `1..morningCount`、下午占 `morningCount+1..`、晚上占 `morningCount+afternoonCount+1..`。
+         * 因此三段在物理上不可能撞键，也就不存在"谁覆盖谁"的歧义。
+         *
+         * 关键点：节数为 0 的时段**整段丢弃**，而不是"偏移 0"。
+         * 否则该段（或其按节数截取的默认值）会落到全局第 1 节，与上午撞键互相覆盖，
+         * 表现为作息时间静默错位——这正是本函数要消除的缺陷。
+         *
+         * 若调用方传入的 map 自身就带越界键（例如默认表比节数长），会被区间过滤掉。
+         */
+        fun mergeSectionTimes(
+            morning: Map<Int, String>,
+            afternoon: Map<Int, String>,
+            evening: Map<Int, String>,
+            morningCount: Int,
+            afternoonCount: Int,
+            eveningCount: Int,
+        ): Map<Int, String> {
+            val result = LinkedHashMap<Int, String>(morning.size + afternoon.size + evening.size)
+            if (morningCount > 0) {
+                result.putAll(
+                    shiftSectionKeys(morning, 0).filterKeys { it in 1..morningCount },
+                )
+            }
+            if (afternoonCount > 0) {
+                result.putAll(
+                    shiftSectionKeys(afternoon, morningCount)
+                        .filterKeys { it in (morningCount + 1)..(morningCount + afternoonCount) },
+                )
+            }
+            if (eveningCount > 0 && morningCount > 0 && afternoonCount > 0) {
+                val base = morningCount + afternoonCount
+                result.putAll(
+                    shiftSectionKeys(evening, base)
+                        .filterKeys { it in (base + 1)..(base + eveningCount) },
+                )
+            }
+            return result
+        }
+
+        /** [shiftSectionKeys] / [mergeSectionTimes] 的"该时段无节次"哨兵值 */
+        const val NO_SECTION_OFFSET = Int.MIN_VALUE
+
+        /**
+         * 某时段的默认作息表，按**该时段实际的节数**取值。
+         *
+         * 原实现的兜底固定返回 4 节默认表（morning_1..4），当上午节数被设为 0 时会产出
+         * "全局第 1 节 = 上午第 1 节时间"这种张冠李戴的条目，与上午默认 4 节时的合法情况
+         * 无法区分。这里改成按节数截取，从源头消除该歧义。
+         *
+         * 注意：已知病态配置（上午 0 节 + 下午 0 节 + 晚上有课）下，课程按 `0+0+相对节次`
+         * 编号，而默认表是各段自己的时间，仍无法精确对齐；此时旧行为是"该课没有时间"，
+         * 新行为是"退化为该段默认时间"。两者都不理想，但后者不会出现空时间导致课程不可见，
+         * 且该配置本身需要用户显式把两段都设为 0 才会出现。
+         */
+        fun defaultTimesFor(period: String, sectionCount: Int): Map<Int, String> {
+            if (sectionCount <= 0) return emptyMap()
+            val template = when (period) {
+                "morning" -> Course.defaultMorningTimes
+                "afternoon" -> Course.defaultAfternoonTimes
+                "evening" -> Course.defaultEveningTimes
+                else -> emptyMap()
+            }
+            return template.filterKeys { it in 1..sectionCount }
+        }
+
         /** 仅用于识别坏快照（键名全对不上时判损坏），不参与取值 */
         private val FIELD_NAMES = setOf(
             "id", "name", "morningSections", "afternoonSections", "eveningSections",

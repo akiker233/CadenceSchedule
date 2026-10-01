@@ -27,6 +27,9 @@ okhttp = "4.12.0"                     # OkHttp HTTP 客户端（版本硬编码�
 shizuku = "13.1.5"                    # Shizuku 免 Root 高权限框架
 navigationevent = "1.1.2"             # AndroidX NavigationEvent（SearchBar 返回处理）
 
+# 测试
+junit = "4.13.2"                      # JUnit4：纯 JVM 单元测试
+
 [libraries]
 # ===== AndroidX 基础 =====
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }                       # 核心 KTX 扩展
@@ -64,6 +67,9 @@ navigationevent-compose = { group = "androidx.navigationevent", name = "navigati
 
 # Backdrop（已 fork 到本地源码 app/src/main/java/com/kyant/backdrop，移除远程 jar 依赖）
 materialKolor-utilities = { group = "com.materialkolor", name = "material-color-utilities", version.ref = "materialKolor" } # Material Color（miuix theme 依赖）
+
+# ===== 测试 =====
+junit = { group = "junit", name = "junit", version.ref = "junit" }                                                 # JUnit4 单元测试
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }     # Android 应用插件

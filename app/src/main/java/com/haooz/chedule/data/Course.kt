@@ -137,7 +137,7 @@ data class Course(
      */
     fun getEffectiveStartTime(sectionTimes: Map<Int, String>): String? {
         if (hasValidCustomTime()) return customStartTime
-        return sectionTimes[startSection]?.split("-")?.firstOrNull()?.trim()
+        return CourseSectionTime.start(sectionTimes[startSection])
     }
 
     /**
@@ -145,7 +145,7 @@ data class Course(
      */
     fun getEffectiveEndTime(sectionTimes: Map<Int, String>): String? {
         if (hasValidCustomTime()) return customEndTime
-        return sectionTimes[endSection]?.split("-")?.lastOrNull()?.trim()
+        return CourseSectionTime.end(sectionTimes[endSection])
     }
 
     fun getWeekTypeText(): String {
@@ -157,6 +157,39 @@ data class Course(
             WEEK_TYPE_EVEN -> "双周"
             else -> ""
         }
+    }
+
+    /**
+     * 本课程实际生效的**离散**周次。
+     *
+     * 优先 `selectedWeeks`；否则按 `startWeek..endWeek` 结合 `weekType` 逐周筛选
+     * （单周只留奇数周、双周只留偶数周、其余全留）。
+     *
+     * 此逻辑此前在 CourseRepository 里写了两份（`resolveSelectedWeeks` 与
+     * `addCourseWeeks`），两者必须完全一致：一份用于调课/合并周次，一份用于算"已占用周"。
+     * 任何一处漏改都会表现为"调课时提示的冲突周与实际占用的周不一致"。
+     *
+     * ⚠️ 与 [CourseScheduleDateBounds] 内部的 `activeWeekRange` **不是**同一语义，不要合并：
+     * 后者为日期推导返回**连续区间**，奇偶跳步由 stepDays 承担；当 startWeek 与 weekType
+     * 奇偶不匹配时它必须保持连续，否则日期推导会漏算。
+     *
+     * @param maxWeek 只保留不超过它的周次；默认不设上限
+     */
+    fun discreteWeeksIn(maxWeek: Int = Int.MAX_VALUE): List<Int> {
+        if (selectedWeeks.isNotEmpty()) {
+            return selectedWeeks.filter { it in 1..maxWeek }
+        }
+        val result = mutableListOf<Int>()
+        val last = minOf(endWeek, maxWeek)
+        if (startWeek > last) return result
+        for (week in maxOf(1, startWeek)..last) {
+            when (weekType) {
+                WEEK_TYPE_ODD -> if (week % 2 == 1) result.add(week)
+                WEEK_TYPE_EVEN -> if (week % 2 == 0) result.add(week)
+                else -> result.add(week)
+            }
+        }
+        return result
     }
 
     fun getSectionText(): String {
