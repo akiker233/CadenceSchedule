@@ -18,12 +18,12 @@ async function fetchStats() {
   } catch (e) {}
 
   try {
-    var res = await fetch('https://api.github.com/repos/HaoZai000/NexioSchedule');
+    var res = await fetch('https://api.github.com/repos/akiker233/CadenceSchedule');
     if (!res.ok) throw new Error(res.status);
     var data = await res.json();
     var stars = data.stargazers_count || 0;
 
-    var relRes = await fetch('https://api.github.com/repos/HaoZai000/NexioSchedule/releases');
+    var relRes = await fetch('https://api.github.com/repos/akiker233/CadenceSchedule/releases');
     var releases = await relRes.json();
     var dl = 0;
     if (Array.isArray(releases)) {

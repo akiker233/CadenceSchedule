@@ -90,7 +90,7 @@ jobs:
               sys.exit(1)
 
           version = sys.argv[1]
-          changelog = pathlib.Path("app/src/main/java/com/haooz/chedule/ui/data/ChangelogData.kt")
+          changelog = pathlib.Path("app/src/main/java/com/cadence/schedule/ui/data/ChangelogData.kt")
           if not changelog.is_file():
               fail("找不到 ChangelogData.kt")
           src = changelog.read_text(encoding="utf-8")
@@ -263,6 +263,6 @@ jobs:
             ${{ steps.apk.outputs.path }}
             ${{ steps.apk.outputs.path }}.sha256
           body_path: RELEASE_NOTE.md
-          name: "Nexio课程表 v${{ steps.version.outputs.version }}"
+          name: "律动课表 v${{ steps.version.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

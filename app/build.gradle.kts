@@ -1,4 +1,4 @@
-// Nexio课程表 - 应用模块构建配置
+// 律动课表 - 应用模块构建配置
 
 import java.net.HttpURLConnection
 import java.net.URL
@@ -19,15 +19,15 @@ val keystoreFile = keystoreFilePath?.takeIf { it.isNotBlank() }?.let { file(it) 
 val hasSigningConfig = keystoreFile?.exists() == true
 
 android {
-    namespace = "com.haooz.chedule"
+    namespace = "com.cadence.schedule"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.haooz.chedule"
+        applicationId = "com.cadence.schedule"
         minSdk = 31
         targetSdk = 37
-        versionCode = 158
-        versionName = "1.6.0.2-0928"
+        versionCode = 159
+        versionName = "1.7.0.0-1001"
 
         // 更新包签名指纹（SHA-256 大写十六进制，无分隔符）。
         // 经 Gradle 属性注入，勿把指纹硬编码进仓库；未配置时回退为「与当前安装包同签名」。

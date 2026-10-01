@@ -55,7 +55,7 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.rememberListPopupLayoutInfo
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.haooz.chedule.ui.utils.PredictiveBackSettings
+import com.cadence.schedule.ui.utils.PredictiveBackSettings
 
 internal val CascadingPopupCornerRadius = 16.dp
 

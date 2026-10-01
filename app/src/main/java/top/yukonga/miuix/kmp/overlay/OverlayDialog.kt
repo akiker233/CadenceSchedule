@@ -11,8 +11,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
-import com.haooz.chedule.ui.effects.miuix.DialogContentLayout
-import com.haooz.chedule.ui.effects.miuix.DialogDefaults
+import com.cadence.schedule.ui.effects.miuix.DialogContentLayout
+import com.cadence.schedule.ui.effects.miuix.DialogDefaults
 import com.kyant.backdrop.Backdrop
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.DialogLayout

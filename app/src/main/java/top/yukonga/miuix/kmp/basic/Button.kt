@@ -30,7 +30,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.haooz.chedule.ui.utils.isAppDarkTheme
+import com.cadence.schedule.ui.utils.isAppDarkTheme
 import com.kyant.capsule.ContinuousRoundedRectangle
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.LocalContentColor

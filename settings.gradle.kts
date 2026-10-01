@@ -1,4 +1,4 @@
-// Nexio课程表 - Gradle 模块配置
+// 律动课表 - Gradle 模块配置
 pluginManagement {
     repositories {
         google {
@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Nexio课程表"
+rootProject.name = "律动课表"
 include(":app")
  
 

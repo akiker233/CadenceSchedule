@@ -36,7 +36,7 @@
         </BroadcastBinder>
 
         <!-- ═══════ 今日课程 · 展示课程数据源（/display 已按今日/明日自动解析, 只读） ═══════ -->
-        <ContentProviderBinder name="displayCourses" uri="content://com.haooz.chedule.courses/display?size=2x2"
+        <ContentProviderBinder name="displayCourses" uri="content://com.cadence.schedule.courses/display?size=2x2"
             columns="id,name,classroom,teacher,section_text,start_time,end_time,color,color_index,row_bg,sub_text,sub_color,is_now,remaining_text,time_range,location_teacher"
             column="name" countName="today_count">
             <Variable name="course_id" column="id" type="string[]" />
@@ -58,7 +58,7 @@
         </ContentProviderBinder>
 
         <!-- ═══════ 今日课程 · 状态数据源（标题/周状态/空态文案, 只读） ═══════ -->
-        <ContentProviderBinder name="courseState" uri="content://com.haooz.chedule.courses/state"
+        <ContentProviderBinder name="courseState" uri="content://com.cadence.schedule.courses/state"
             columns="title,week_text,empty_text,show_tomorrow"
             column="title" countName="state_count">
             <Variable name="state_title" column="title" type="string" />
@@ -324,7 +324,7 @@
         <Button x="0" y="0" w="#view_width" h="#view_height" contentDescriptionExp="@state_title+' '+num(#today_count)+' 节'">
             <Triggers>
                 <Trigger action="up" condition="!eqs(@isPreviewMode,'true')">
-                    <IntentCommand package="com.haooz.chedule" class="com.haooz.chedule.ui.activities.MainActivity" action="android.intent.action.MAIN" />
+                    <IntentCommand package="com.cadence.schedule" class="com.cadence.schedule.ui.activities.MainActivity" action="android.intent.action.MAIN" />
                 </Trigger>
             </Triggers>
         </Button>

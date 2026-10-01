@@ -1,20 +1,17 @@
 {
-  "name": "kecb",
+  "name": "cadence-schedule",
   "version": "1.0.0",
-  "description": "<div align=\"center\">",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "description": "律动课表（Cadence）—— 基于 Jetpack Compose 的 Android 课程表应用",
+  "private": true,
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/com_haooz_account/hyper_schedule"
+    "url": "https://github.com/akiker233/CadenceSchedule"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "keywords": [
+    "android",
+    "kotlin",
+    "jetpack-compose",
+    "timetable"
+  ],
+  "license": "AGPL-3.0"
 }

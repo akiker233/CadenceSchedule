@@ -23,19 +23,19 @@
 -keepattributes *Annotation*
 
 # Gson 反射读写的数据类，字段名不可被混淆
--keep class com.haooz.chedule.data.Course { <fields>; }
--keep class com.haooz.chedule.data.TimeConfig { <fields>; }
+-keep class com.cadence.schedule.data.Course { <fields>; }
+-keep class com.cadence.schedule.data.TimeConfig { <fields>; }
 # 课表文件夹：CourseRepository 用 gson.toJson/fromJson 直接读写（KEY_SCHEDULE_FOLDERS）。
 # 此前遗漏，只因 -dontobfuscate 掩盖；一旦恢复混淆，文件夹会静默反序列化失败。
--keep class com.haooz.chedule.data.ScheduleFolder { <fields>; }
+-keep class com.cadence.schedule.data.ScheduleFolder { <fields>; }
 # 搭配外观快照与特殊时段块（嵌套在 TimeConfig 内）
--keep class com.haooz.chedule.data.CombinationStyle { <fields>; }
--keep class com.haooz.chedule.data.SpecialBlock { <fields>; }
--keep class com.haooz.chedule.data.SpecialItem { <fields>; }
+-keep class com.cadence.schedule.data.CombinationStyle { <fields>; }
+-keep class com.cadence.schedule.data.SpecialBlock { <fields>; }
+-keep class com.cadence.schedule.data.SpecialItem { <fields>; }
 # Gson 枚举按 name() 写入 / valueOf() 读回
--keep class com.haooz.chedule.data.CardContentAlignment { <fields>; }
--keep class com.haooz.chedule.data.CardTextColor { <fields>; }
--keep class com.haooz.chedule.data.CardRefractionLevel { <fields>; }
+-keep class com.cadence.schedule.data.CardContentAlignment { <fields>; }
+-keep class com.cadence.schedule.data.CardTextColor { <fields>; }
+-keep class com.cadence.schedule.data.CardRefractionLevel { <fields>; }
 
 # 以下三类不需要自己写规则，对应 AAR 已内置 consumer rules，重复声明只会额外
 # 禁止重命名、削弱优化（已用真机验证）：
@@ -58,35 +58,35 @@
 -dontwarn rikka.sui.**
 # PrivilegedServiceImpl 通过 ComponentName(name) 绑定到 Shizuku 进程，
 # IPrivilegedService.Stub 的 Binder 协议依赖类名
--keep class com.haooz.chedule.shizuku.** { *; }
+-keep class com.cadence.schedule.shizuku.** { *; }
 
 # --- 超级岛通知 ---
 # isIslandSupported() 反射调用 android.os.SystemProperties；
 # sendIslandNotification() 构建 miui.focus.param 焦点通知 extras
--keep class com.haooz.chedule.reminder.IslandNotificationHelper { *; }
--keep class com.haooz.chedule.reminder.IslandExpandReceiver { *; }
+-keep class com.cadence.schedule.reminder.IslandNotificationHelper { *; }
+-keep class com.cadence.schedule.reminder.IslandExpandReceiver { *; }
 
 # --- 教务导入 ---
 # AndroidBridge 的 @JavascriptInterface 方法由 WebView 按方法名反射调用
 # （AGP 默认规则已覆盖 @JavascriptInterface；这里保留是为了同时固定其内部
 #   JsonModel 嵌套类的字段名，Gson 靠字段名反序列化）
--keep class com.haooz.chedule.ui.web.AndroidBridge { *; }
--keep class com.haooz.chedule.ui.web.AndroidBridge$* { <fields>; }
+-keep class com.cadence.schedule.ui.web.AndroidBridge { *; }
+-keep class com.cadence.schedule.ui.web.AndroidBridge$* { <fields>; }
 # 这些类通过 Gson 反射解析，字段名不可被混淆
--keep class com.haooz.chedule.data.school.SchoolIndexData { <fields>; }
--keep class com.haooz.chedule.data.school.SchoolData { <fields>; }
--keep class com.haooz.chedule.data.school.AdapterData { <fields>; }
+-keep class com.cadence.schedule.data.school.SchoolIndexData { <fields>; }
+-keep class com.cadence.schedule.data.school.SchoolData { <fields>; }
+-keep class com.cadence.schedule.data.school.AdapterData { <fields>; }
 
 # --- WakeUp / 星链 口令导入（课表导入页）---
 # WakeUpHeadlessBridge：无界面 WebView 的 @JavascriptInterface，按方法名反射
--keep class com.haooz.chedule.data.WakeUpHeadlessBridge { *; }
+-keep class com.cadence.schedule.data.WakeUpHeadlessBridge { *; }
 # 嵌套 Gson 模型：字段名无 @SerializedName，必须 keep 字段
--keep class com.haooz.chedule.data.WakeUpHeadlessBridge$* { <fields>; }
+-keep class com.cadence.schedule.data.WakeUpHeadlessBridge$* { <fields>; }
 # 星链 HTTP 响应等 Gson 模型（含 @SerializedName，仍 keep 字段更稳）
--keep class com.haooz.chedule.data.ThirdPartyShareImporter$* { <fields>; }
--keep class com.haooz.chedule.data.ThirdPartyCourse { <fields>; }
--keep class com.haooz.chedule.data.ThirdPartySharePayload { <fields>; }
--keep class com.haooz.chedule.data.ThirdPartyTimeSlot { <fields>; }
+-keep class com.cadence.schedule.data.ThirdPartyShareImporter$* { <fields>; }
+-keep class com.cadence.schedule.data.ThirdPartyCourse { <fields>; }
+-keep class com.cadence.schedule.data.ThirdPartySharePayload { <fields>; }
+-keep class com.cadence.schedule.data.ThirdPartyTimeSlot { <fields>; }
 
 # ============================================================
 # 已删除的死规则（匹配不到任何类，删除后 APK 字节数不变，仅作记录避免被"补"回来）：

@@ -61,8 +61,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.haooz.chedule.ui.effects.edgelight.edgeLight
-import com.haooz.chedule.ui.effects.edgelight.rememberDefaultEdgeLight
+import com.cadence.schedule.ui.effects.edgelight.edgeLight
+import com.cadence.schedule.ui.effects.edgelight.rememberDefaultEdgeLight
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.vibrancy

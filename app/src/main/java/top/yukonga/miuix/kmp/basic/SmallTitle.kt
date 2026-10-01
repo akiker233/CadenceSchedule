@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.haooz.chedule.ui.utils.isAppDarkTheme
+import com.cadence.schedule.ui.utils.isAppDarkTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**

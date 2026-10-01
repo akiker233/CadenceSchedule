@@ -73,9 +73,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import com.haooz.chedule.ui.effects.edgelight.edgeLight
-import com.haooz.chedule.ui.effects.edgelight.rememberLiquidTopBarButtonEdgeLight
-import com.haooz.chedule.ui.utils.isAppDarkTheme
+import com.cadence.schedule.ui.effects.edgelight.edgeLight
+import com.cadence.schedule.ui.effects.edgelight.rememberLiquidTopBarButtonEdgeLight
+import com.cadence.schedule.ui.utils.isAppDarkTheme
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur

@@ -50,7 +50,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import com.haooz.chedule.ui.utils.PredictiveBackSettings
+import com.cadence.schedule.ui.utils.PredictiveBackSettings
 
 // 本地动画参数（库版本没有这些属性）
 private val FractionEnterAnimSpec = spring<Float>(dampingRatio = 0.78f, stiffness = 232f, visibilityThreshold = 0.0001f)
