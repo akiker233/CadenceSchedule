@@ -45,11 +45,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # compileSdk / targetSdk 为 37，必须显式安装，否则 aapt2 与 android.jar 都找不到
+      # compileSdk / targetSdk 为 37，必须显式安装，否则 aapt2 与 android.jar 都找不到。
+      # 注意包 ID 是 android-37.0（该平台的 api-level 就是 37.0，写成 android-37 会报
+      # "Failed to find package"，正是本流程第一版失败的根因）。
+      # 同时保留 AGP 自动下载作为兜底（见下方 -Pandroid.builder.sdkDownload=true）。
       - name: Install Android SDK components
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-37 build-tools;37.0.0 platform-tools'
+          packages: 'platforms;android-37.0 build-tools;37.0.0 platform-tools'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -123,7 +126,7 @@ jobs:
           PY
 
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest -Pandroid.builder.sdkDownload=true --stacktrace
 
       - name: Write signing keystore
         env:
@@ -148,9 +151,9 @@ jobs:
         run: |
           EXPECTED="${{ secrets.NEXIO_EXPECTED_SIGNER_SHA256 }}"
           if [ -n "$EXPECTED" ]; then
-            ./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256="$EXPECTED" --stacktrace
+            ./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256="$EXPECTED" -Pandroid.builder.sdkDownload=true --stacktrace
           else
-            ./gradlew :app:assembleRelease --stacktrace
+            ./gradlew :app:assembleRelease -Pandroid.builder.sdkDownload=true --stacktrace
           fi
 
       - name: Locate APK
