@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   系统备份规则（Android 11 及以下 / fullBackupContent）。
+
+   有意保留课表数据在系统备份内：换机后课表、文件夹、节假日与调休设置随系统备份直接恢复。
+   但以下内容**必须排除**：
+   - webdav_config：WebDAV 用户名与密码，明文存储，不能进云端备份；
+   - stats_prefs：持久设备 UUID（统计上报用），属设备标识，跨设备还原无意义且有隐私风险；
+   - repo/：教务适配脚本与索引缓存，可随时重新下载，无需备份。
+   另见 res/xml/data_extraction_rules.xml（Android 12+ 的对应规则），两者需保持一致。
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="webdav_config.xml" />
+    <exclude domain="sharedpref" path="stats_prefs.xml" />
+    <exclude domain="file" path="repo" />
 </full-backup-content>

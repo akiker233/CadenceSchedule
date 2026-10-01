@@ -13,6 +13,21 @@ import com.haooz.chedule.data.CourseRepository
 import com.haooz.chedule.reminder.CourseReminderHelper
 import java.util.Calendar
 
+/**
+ * 今日/明日课程数据的只读出口，同时服务于两类消费者：
+ * 1. 本应用桌面小组件（widget/ 下的 AppWidgetProvider 直接读仓库，多数不经过这里）；
+ * 2. **MIUI 主题小组件**（mtzwidget/todaycourse）——它在应用进程之外运行，
+ *    通过 `ContentProviderBinder uri="content://com.haooz.chedule.courses/display"`
+ *    拉取渲染所需字段，依赖本 provider 的映射与截断逻辑。
+ *
+ * ⚠️ 有意维持「无 readPermission 的公开只读」：这是 MIUI 主题小组件的硬依赖，
+ * 主题包不在本应用签名体系内，加权限会直接导致已发布主题的桌面小组件读不到数据。
+ * 若将来要收口，必须同步改造 mtzwidget/ 下的主题包并通知已安装用户更新主题，
+ * 不要只改 AndroidManifest。
+ *
+ * 已知代价：设备上任意应用均可 query 到课程名/教室/教师/节次/作息（无个人身份信息）。
+ * 该权衡已在隐私政策中披露。
+ */
 class TodayCoursesProvider : ContentProvider() {
 
     override fun onCreate(): Boolean = context != null

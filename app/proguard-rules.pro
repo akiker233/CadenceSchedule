@@ -25,6 +25,9 @@
 # Gson 反射读写的数据类，字段名不可被混淆
 -keep class com.haooz.chedule.data.Course { <fields>; }
 -keep class com.haooz.chedule.data.TimeConfig { <fields>; }
+# 课表文件夹：CourseRepository 用 gson.toJson/fromJson 直接读写（KEY_SCHEDULE_FOLDERS）。
+# 此前遗漏，只因 -dontobfuscate 掩盖；一旦恢复混淆，文件夹会静默反序列化失败。
+-keep class com.haooz.chedule.data.ScheduleFolder { <fields>; }
 # 搭配外观快照与特殊时段块（嵌套在 TimeConfig 内）
 -keep class com.haooz.chedule.data.CombinationStyle { <fields>; }
 -keep class com.haooz.chedule.data.SpecialBlock { <fields>; }

@@ -4,6 +4,16 @@
 
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
+    <!--
+      应用内部广播的签名级权限：仅同签名进程可发送。
+      用于「实况通知/超级岛按钮」与「岛展开」这类 exported receiver——
+      它们必须导出才能被系统通知栏触发，但绝不能让任意第三方应用伪造。
+    -->
+    <permission
+        android:name="com.haooz.chedule.permission.INTERNAL_BROADCAST"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.haooz.chedule.permission.INTERNAL_BROADCAST" />
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -14,12 +24,19 @@
         tools:ignore="RequestInstallPackagesPolicy" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!--
+      提醒完全由 AlarmManager 精确闹钟驱动，不存在常驻或前台 Service，
+      因此不声明 FOREGROUND_SERVICE / FOREGROUND_SERVICE_SPECIAL_USE（历史遗留，已移除）。
+    -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!--
+      有意保留 USE_EXACT_ALARM（受限权限）：本应用不经 Google Play 分发，
+      不存在上架审核约束；课表边界闹钟（上课/下课/课前提醒）要求准点，
+      依赖它免除运行时授权弹窗。
+    -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"
         tools:ignore="ExactAlarm" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
@@ -259,6 +276,7 @@
         <receiver
             android:name=".reminder.IslandExpandReceiver"
             android:exported="true"
+            android:permission="com.haooz.chedule.permission.INTERNAL_BROADCAST"
             tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="com.haooz.chedule.ACTION_ISLAND_EXPAND" />
@@ -277,10 +295,12 @@
             android:name=".reminder.CourseStartReceiver"
             android:exported="false" />
 
-        <!-- 上课勿扰：接收实况通知/超级岛按钮与上课、下课闹钟（exported：需要系统通知栏发送广播） -->
+        <!-- 上课勿扰：接收实况通知/超级岛按钮与上课、下课闹钟
+             （exported：系统通知栏需要发送广播；签名级权限保证只有本应用能发） -->
         <receiver
             android:name=".reminder.ClassDndReceiver"
             android:exported="true"
+            android:permission="com.haooz.chedule.permission.INTERNAL_BROADCAST"
             tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="com.haooz.chedule.ACTION_CLASS_DND_TOGGLE" />
@@ -289,9 +309,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- 开机/更新/改时间重排闹钟。
+             系统只向已安装应用的 manifest receiver 投递这些受保护广播，
+             因此 exported 保持 false 即可收到；此前 exported=true 会让任意第三方
+             伪造 TIME_SET 触发闹钟全量重排。 -->
         <receiver
             android:name=".reminder.BootCompletedReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <!-- 应用更新后系统会清空本 app 的全部闹钟，需重新注册 -->

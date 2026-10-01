@@ -31,7 +31,9 @@ internal object UpdateChecker {
         val body: String,
         val htmlUrl: String,
         val apkUrl: String,
-        val createdAt: String
+        val createdAt: String,
+        /** 远端 tag 低于当前安装版本；用于界面提示，此类版本永不提供下载 */
+        val isDowngrade: Boolean = false
     )
 
     /**
@@ -63,6 +65,14 @@ internal object UpdateChecker {
         }
         return false
     }
+
+    /**
+     * remote 是否为**低于** local 的版本（降级）。
+     *
+     * 更新源被冒用或中间人改写时，攻击者常把用户"更新"到带已知漏洞的旧版本；
+     * `pm install -r` 本身不拦降级，所以这里显式判定并在 UI 上禁止。
+     */
+    fun isDowngrade(remote: String, local: String): Boolean = isNewerVersion(local, remote)
 
     // 需在 IO 线程调用。
     // stable: 正式通道，跳过 prerelease 与 beta 版本（含第4段版本号）
@@ -140,10 +150,17 @@ internal object UpdateChecker {
 
             val tagVersion = tagName.removePrefix("v")
             val appVersion = currentVersion.removePrefix("v")
-            val hasUpdate = isNewerVersion(tagVersion, appVersion)
+            // 降级保护：远端 tag 低于当前版本时一律不提供更新。
+            // 这里是唯一关口——UI 多处复用本方法，把判定放在源头才能保证没有绕过路径。
+            val isDowngrade = isDowngrade(tagVersion, appVersion)
+            val hasUpdate = !isDowngrade && isNewerVersion(tagVersion, appVersion)
 
-            Log.d(TAG, "检查完成: channel=$channel, hasUpdate=$hasUpdate, remote=$tagVersion, local=$appVersion")
-            Pair(hasUpdate, GiteeRelease(tagName, name, body, htmlUrl, apkUrl, createdAt))
+            Log.d(
+                TAG,
+                "检查完成: channel=$channel, hasUpdate=$hasUpdate, downgrade=$isDowngrade, " +
+                    "remote=$tagVersion, local=$appVersion"
+            )
+            Pair(hasUpdate, GiteeRelease(tagName, name, body, htmlUrl, apkUrl, createdAt, isDowngrade))
         } catch (e: Exception) {
             Log.e(TAG, "检查更新失败", e)
             Pair(false, null)

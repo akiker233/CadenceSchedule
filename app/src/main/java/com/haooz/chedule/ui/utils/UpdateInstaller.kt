@@ -27,11 +27,20 @@ internal object UpdateInstaller {
         File(context.filesDir, "update-$tag.apk.part")
 
     fun hasValidApk(context: Context, tag: String): Boolean {
-        return UpdateChecker.isLikelyCompleteApk(apkFile(context, tag))
+        val file = apkFile(context, tag)
+        if (!UpdateChecker.isLikelyCompleteApk(file)) return false
+        // 已下载的包在复用前必须重验签名：文件可能来自更早的版本，或下载期间被替换
+        val verdict = ApkSignatureVerifier.verify(context, file)
+        if (verdict is ApkSignatureVerifier.Result.Invalid) {
+            android.util.Log.w("UpdateInstaller", "丢弃签名校验失败的已下载包: ${verdict.reason}")
+            return false
+        }
+        return true
     }
 
     /**
      * 下载 APK：先写 .part，完整后再原子 rename，避免半成品被当成可安装包。
+     * 落盘后**必须通过签名校验**才会返回，校验失败即删除文件并抛错。
      * @param onProgress 0f..1f，在主线程回调
      */
     suspend fun downloadApk(
@@ -74,6 +83,14 @@ internal object UpdateInstaller {
                 part.delete()
                 throw java.io.IOException("APK 包体校验失败")
             }
+            // 签名校验：不通过一律删除，绝不让来路不明的包进入可安装状态
+            when (val verdict = ApkSignatureVerifier.verify(context, part)) {
+                is ApkSignatureVerifier.Result.Invalid -> {
+                    part.delete()
+                    throw java.io.IOException(verdict.reason)
+                }
+                is ApkSignatureVerifier.Result.Valid -> Unit
+            }
             if (finalFile.exists()) finalFile.delete()
             if (!part.renameTo(finalFile)) {
                 part.delete()
@@ -88,6 +105,9 @@ internal object UpdateInstaller {
 
     /**
      * 安装 APK：优先 Shizuku 静默安装，失败回退系统安装器。
+     *
+     * 这里是**最后一道闸**：Shizuku 静默安装没有用户可见的确认过程，因此安装前必须重验签名，
+     * 否则任何绕过 [downloadApk] 的调用路径都能把未校验的包塞进来。
      * @param onInstallingChanged 主线程回调安装中状态
      * @param onFinished 主线程回调结束（静默成功/失败回退系统安装器/系统安装器已拉起）
      */
@@ -97,6 +117,16 @@ internal object UpdateInstaller {
         onInstallingChanged: (Boolean) -> Unit,
         onFinished: (() -> Unit)? = null,
     ) {
+        when (val verdict = ApkSignatureVerifier.verify(context, file)) {
+            is ApkSignatureVerifier.Result.Invalid -> {
+                Toast.makeText(context, verdict.reason, Toast.LENGTH_LONG).show()
+                android.util.Log.e("UpdateInstaller", "拒绝安装未通过签名校验的包: ${file.name}")
+                onFinished?.invoke()
+                return
+            }
+            is ApkSignatureVerifier.Result.Valid -> Unit
+        }
+
         if (ShizukuManager.isShizukuRunning() && ShizukuManager.checkSelfPermission()) {
             onInstallingChanged(true)
             installScope.launch {
