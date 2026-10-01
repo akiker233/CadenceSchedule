@@ -185,9 +185,25 @@ jobs:
           echo "使用: $APKSIGNER"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
 
-          ACTUAL=$(grep -i 'certificate SHA-256 digest' /tmp/certs.txt | head -1 | awk -F': ' '{print $2}' | tr -d ':' | tr 'a-f' 'A-F')
-          if [ -z "$ACTUAL" ]; then
-            echo "::error::未能从 apksigner 输出解析签名指纹"
+          # 提取并归一化实际指纹。
+          # 注意 apksigner 的输出形如「V2 Signer: certificate SHA-256 digest: ab12...」，
+          # 冒号在 "V2 Signer:" 处就已出现，因此**不能**按 ': ' 切分取第二段
+          # （那会得到 "certificate SHA-256 digest: ab12..." 带标签的整段）。
+          # 这里直接抓 64 位十六进制值，与前缀格式无关。
+          # 另外：本步骤默认带 set -e -o pipefail，任何一步无匹配就会让整步失败且不打印
+          # 下面的诊断信息，所以这里用 `|| true` 兜底，由后续显式判断给出可读错误。
+          ACTUAL=$(grep -iE 'SHA-256 digest:[[:space:]]*[0-9a-fA-F]{64}' /tmp/certs.txt \
+            | head -1 \
+            | sed -E 's/.*SHA-256 digest:[[:space:]]*//' \
+            | sed -E 's/[^0-9a-fA-F]//g' \
+            | tr 'a-f' 'A-F' || true)
+          ACTUAL=$(echo "$ACTUAL" | tr -d '[:space:]')
+
+          if [ "${#ACTUAL}" -ne 64 ]; then
+            echo "::error::未能从 apksigner 输出解析出 64 位 SHA-256 指纹（实际取到 ${#ACTUAL} 位）。"
+            echo "----- apksigner 原始输出 -----"
+            cat /tmp/certs.txt
+            echo "------------------------------"
             exit 1
           fi
           echo "APK 签名指纹: $ACTUAL"
@@ -199,11 +215,18 @@ jobs:
             exit 0
           fi
 
-          EXPECTED=$(echo "$EXPECTED_SHA256" | tr -d ':' | tr 'a-f' 'A-F')
+          EXPECTED=$(echo "$EXPECTED_SHA256" | tr -d ':' | tr -d '[:space:]' | tr 'a-f' 'A-F')
+          if [ "${#EXPECTED}" -ne 64 ]; then
+            echo "::error::NEXIO_EXPECTED_SIGNER_SHA256 长度异常（去冒号后 ${#EXPECTED} 位，应为 64 位）"
+            exit 1
+          fi
+
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::签名指纹与期望值不一致，请勿发布"
             echo "  实际: $ACTUAL"
             echo "  期望: $EXPECTED"
+            echo "提示：期望值必须与签名库 release.jks 的证书指纹一致；"
+            echo "      若刚换过签名库，请同步更新该 secret 并重新发布。"
             exit 1
           fi
           echo "签名指纹对账通过"
