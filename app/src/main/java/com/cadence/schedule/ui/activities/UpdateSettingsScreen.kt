@@ -71,7 +71,7 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.io.File
 import androidx.compose.ui.graphics.Color as ComposeColor
 
-private data class GiteeRelease(
+private data class ReleaseInfo(
     val tagName: String,
     val name: String,
     val body: String,
@@ -82,14 +82,14 @@ private data class GiteeRelease(
 
 private fun checkForUpdate(
     context: Context,
-    source: String = "gitee",
+    source: String = "github",
     channel: String = "stable"
-): Pair<Boolean, GiteeRelease?> {
+): Pair<Boolean, ReleaseInfo?> {
     val (hasUpdate, release) = UpdateChecker.checkForUpdate(context, source, channel)
     return Pair(
         hasUpdate,
         release?.let {
-            GiteeRelease(it.tagName, it.name, it.body, it.htmlUrl, it.apkUrl, it.createdAt)
+            ReleaseInfo(it.tagName, it.name, it.body, it.htmlUrl, it.apkUrl, it.createdAt)
         }
     )
 }
@@ -118,12 +118,7 @@ fun UpdateSettingsScreen(
             prefs.getString("update_channel", "stable") ?: "stable"
         )
     }
-    var downloadSource by remember {
-        mutableStateOf(
-            prefs.getString("download_source", "gitee") ?: "gitee"
-        )
-    }
-    val effectiveDownloadSource = if (updateChannel == "beta") "gitee" else downloadSource
+    // 下载源已统一为自有 GitHub 仓库，不再有可选项
 
     val currentVersion = remember {
         try {
@@ -143,7 +138,7 @@ fun UpdateSettingsScreen(
         val savedBody = prefs.getString("latest_body", null)
         val savedDate = prefs.getString("latest_date", null)
         mutableStateOf(
-            if (savedUrl != null && savedTag != null) GiteeRelease(
+            if (savedUrl != null && savedTag != null) ReleaseInfo(
                 savedTag,
                 savedName ?: "",
                 savedBody ?: "",
@@ -170,7 +165,7 @@ fun UpdateSettingsScreen(
             if (lastCheckDate != today) {
                 isChecking = true
                 val (update, release) = withContext(Dispatchers.IO) {
-                    checkForUpdate(context, effectiveDownloadSource, updateChannel)
+                    checkForUpdate(context, channel = updateChannel)
                 }
                 hasUpdate = update
                 latestRelease = release
@@ -331,7 +326,7 @@ fun UpdateSettingsScreen(
                                         isChecking = true
                                         coroutineScope.launch {
                                             val (update, release) = withContext(Dispatchers.IO) {
-                                                checkForUpdate(context, effectiveDownloadSource, updateChannel)
+                                                checkForUpdate(context, channel = updateChannel)
                                             }
                                             hasUpdate = update
                                             latestRelease = release
@@ -423,42 +418,15 @@ fun UpdateSettingsScreen(
                             OverlayDropdownMenu(
                                 title = "更新通道",
                                 entry = channelEntry,
-                                collapseOnSelection = true,
-                                liquidGlassBackdrop = liquidGlassBackdrop,
-                                dropdownColors = liquidGlassDropdownColors,
-                            )
-                            val downloadSourceEntry = DropdownEntry(
-                                items = listOf(
-                                    DropdownItem(
-                                        text = "Gitee",
-                                        selected = effectiveDownloadSource == "gitee",
-                                        onClick = {
-                                            downloadSource = "gitee"
-                                            prefs.edit { putString("download_source", "gitee") }
-                                        }
-                                    ),
-                                    DropdownItem(
-                                        text = "GitHub",
-                                        selected = effectiveDownloadSource == "github",
-                                        onClick = {
-                                            downloadSource = "github"
-                                            prefs.edit { putString("download_source", "github") }
-                                        }
-                                    ),
-                                )
-                            )
-                            OverlayDropdownMenu(
-                                title = "下载源",
-                                summary = if (updateChannel == "beta") "Beta 通道已锁定 Gitee" else "选择应用更新的下载仓库",
-                                entry = downloadSourceEntry,
-                                enabled = updateChannel != "beta",
-                                collapseOnSelection = true,
-                                liquidGlassBackdrop = liquidGlassBackdrop,
-                                dropdownColors = liquidGlassDropdownColors,
-                            )
-                        }
-                    }
-                }
+                                 collapseOnSelection = true,
+                                 liquidGlassBackdrop = liquidGlassBackdrop,
+                                 dropdownColors = liquidGlassDropdownColors,
+                             )
+                             // 「下载源」选择器已移除：原先的 Gitee 源指向第三方仓库，
+                             // 与签名校验/指纹对账（只对自有仓库有意义）相冲突，故统一为 GitHub。
+                         }
+                     }
+                 }
 
                 item {
                     Card(

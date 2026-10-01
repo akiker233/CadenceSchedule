@@ -25,7 +25,7 @@ internal object UpdateChecker {
     private const val PART_SUFFIX = ".part"
     private const val MIN_COMPLETE_APK_BYTES = 512L * 1024L
 
-    data class GiteeRelease(
+    data class ReleaseInfo(
         val tagName: String,
         val name: String,
         val body: String,
@@ -77,7 +77,13 @@ internal object UpdateChecker {
     // 需在 IO 线程调用。
     // stable: 正式通道，跳过 prerelease 与 beta 版本（含第4段版本号）
     // beta: 可检测正式版 + beta 版
-    fun checkForUpdate(context: Context, source: String = "gitee", channel: String = "stable"): Pair<Boolean, GiteeRelease?> {
+    //
+    // source 参数保留仅为兼容既有调用与偏好设置（历史上有 gitee 源）。
+    // 现已删除 Gitee 源：原先它指向的是**上游作者**的仓库，会把用户引向别人的版本；
+    // 且更新链路（签名校验、指纹对账）只对自有仓库的产物有意义。
+    // 该参数当前不再影响任何行为，所有来源统一查自有 GitHub 仓库。
+    @Suppress("UNUSED_PARAMETER")
+    fun checkForUpdate(context: Context, source: String = "github", channel: String = "stable"): Pair<Boolean, ReleaseInfo?> {
         return try {
             val client = okhttp3.OkHttpClient.Builder()
                 .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
@@ -86,17 +92,11 @@ internal object UpdateChecker {
 
             // 注意：这里查的是**本应用自己的**发布仓库。批量改名时曾把上游仓库名一并替换，
             // 会造成更新器指向不存在的仓库，改动此 URL 前请确认仓库真实存在。
-            val baseUrl = if (source == "github") {
-                "https://api.github.com/repos/akiker233/CadenceSchedule/releases"
-            } else {
-                "https://gitee.com/api/v5/repos/com_haooz_account/hyper_schedule/releases"
-            }
+            val baseUrl = "https://api.github.com/repos/akiker233/CadenceSchedule/releases"
             val url = "$baseUrl?page=1&per_page=10&direction=desc&t=${System.currentTimeMillis()}"
-            val request = okhttp3.Request.Builder().url(url).apply {
-                if (source == "github") {
-                    header("Accept", "application/vnd.github.v3+json")
-                }
-            }.build()
+            val request = okhttp3.Request.Builder().url(url)
+                .header("Accept", "application/vnd.github.v3+json")
+                .build()
             val response = client.newCall(request).execute()
 
             if (!response.isSuccessful) {
@@ -162,7 +162,7 @@ internal object UpdateChecker {
                 "检查完成: channel=$channel, hasUpdate=$hasUpdate, downgrade=$isDowngrade, " +
                     "remote=$tagVersion, local=$appVersion"
             )
-            Pair(hasUpdate, GiteeRelease(tagName, name, body, htmlUrl, apkUrl, createdAt, isDowngrade))
+            Pair(hasUpdate, ReleaseInfo(tagName, name, body, htmlUrl, apkUrl, createdAt, isDowngrade))
         } catch (e: Exception) {
             Log.e(TAG, "检查更新失败", e)
             Pair(false, null)

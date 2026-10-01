@@ -79,11 +79,10 @@ internal fun UpdateDialog(liquidGlassBackdrop: com.kyant.backdrop.Backdrop? = nu
 
         if (lastCheckDate != today) {
             val updateChannel = updatePrefs.getString("update_channel", "stable") ?: "stable"
-            val downloadSource = if (updateChannel == "beta") "gitee" else
-                (updatePrefs.getString("download_source", "gitee") ?: "gitee")
+            // 下载源已统一为自有 GitHub 仓库（不再区分来源）
             val (hasUpdate, release) = withContext(Dispatchers.IO) {
                 try {
-                    UpdateChecker.checkForUpdate(context, downloadSource, updateChannel)
+                    UpdateChecker.checkForUpdate(context, channel = updateChannel)
                 } catch (e: Exception) {
                     Log.e("UpdateDialog", "检查更新失败", e)
                     Pair(false, null)

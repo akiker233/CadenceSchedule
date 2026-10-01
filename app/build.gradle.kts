@@ -26,8 +26,10 @@ android {
         applicationId = "com.cadence.schedule"
         minSdk = 31
         targetSdk = 37
+        // versionCode 继续递增（更名前最大为 158），不因更名回退：
+        // Android 用它判断能否覆盖安装，回退会带来不必要的风险。
         versionCode = 159
-        versionName = "1.7.0.0-1001"
+        versionName = "1.0.0-1001"
 
         // 更新包签名指纹（SHA-256 大写十六进制，无分隔符）。
         // 经 Gradle 属性注入，勿把指纹硬编码进仓库；未配置时回退为「与当前安装包同签名」。
