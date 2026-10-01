@@ -33,8 +33,8 @@ android {
 
         // 更新包签名指纹（SHA-256 大写十六进制，无分隔符）。
         // 经 Gradle 属性注入，勿把指纹硬编码进仓库；未配置时回退为「与当前安装包同签名」。
-        // 构建命令示例：-Pnexio.expectedSignerSha256=AB12...（也可写进 ~/.gradle/gradle.properties）
-        val expectedSigner = (project.findProperty("nexio.expectedSignerSha256") as String?)
+        // 构建命令示例：-Pcadence.expectedSignerSha256=AB12...（也可写进 ~/.gradle/gradle.properties）
+        val expectedSigner = (project.findProperty("cadence.expectedSignerSha256") as String?)
             ?.replace(":", "")
             ?.uppercase()
             .orEmpty()

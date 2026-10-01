@@ -132,7 +132,7 @@ jobs:
             echo "::warning::未配置 NEXIO_KEYSTORE_BASE64，本次产物将是未签名 APK（用户无法直接安装）"
             exit 0
           fi
-          KEYSTORE="$RUNNER_TEMP/nexio-release.jks"
+          KEYSTORE="$RUNNER_TEMP/cadence-release.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
           echo "NEXIO_KEYSTORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
           echo "已写入签名库到 runner 临时目录"
@@ -147,7 +147,7 @@ jobs:
         run: |
           EXPECTED="${{ secrets.NEXIO_EXPECTED_SIGNER_SHA256 }}"
           if [ -n "$EXPECTED" ]; then
-            ./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256="$EXPECTED" -Pandroid.builder.sdkDownload=true --stacktrace
+            ./gradlew :app:assembleRelease -Pcadence.expectedSignerSha256="$EXPECTED" -Pandroid.builder.sdkDownload=true --stacktrace
           else
             ./gradlew :app:assembleRelease -Pandroid.builder.sdkDownload=true --stacktrace
           fi
@@ -210,7 +210,7 @@ jobs:
 
           if [ -z "$EXPECTED_SHA256" ]; then
             echo "::warning::未配置 NEXIO_EXPECTED_SIGNER_SHA256，跳过指纹对账。"
-            echo "::warning::建议配置该 secret，并在构建时以 -Pnexio.expectedSignerSha256 注入，"
+            echo "::warning::建议配置该 secret，并在构建时以 -Pcadence.expectedSignerSha256 注入，"
             echo "::warning::否则 App 内的更新校验只能退化为『与当前安装包同签名』。"
             exit 0
           fi
@@ -249,7 +249,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nexio-release-${{ steps.version.outputs.version }}
+          name: cadence-release-${{ steps.version.outputs.version }}
           path: |
             ${{ steps.apk.outputs.path }}
             ${{ steps.apk.outputs.path }}.sha256

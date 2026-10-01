@@ -11,7 +11,7 @@ import java.security.MessageDigest
 /**
  * 更新包签名校验。
  *
- * 本应用不经应用商店分发，更新完全依赖自带更新器：从 GitHub/Gitee Release 读下载链接 →
+ * 本应用不经应用商店分发，更新完全依赖自带更新器：从 GitHub Release 读下载链接 →
  * HTTP 下载 → FileProvider 或 Shizuku 安装。这条链路原先只校验 ZIP 魔数与体积，
  * **不校验签名**，一旦更新源账号被冒用、或下载经中间人改写，用户拿到的就是一个来路不明的包。
  * 平台侧只会在「签名与已装应用不一致」时拒绝覆盖安装，属于事后兜底，不是纵深防御。
@@ -19,7 +19,7 @@ import java.security.MessageDigest
  * 因此在写入可安装状态之前，必须先用本文件把签名核对一遍。
  *
  * 期望指纹来源（[BuildConfig.EXPECTED_SIGNER_SHA256]）：
- * - 配置了 `-Pnexio.expectedSignerSha256=...`：严格使用该指纹，**跨签名来源也拦得住**；
+ * - 配置了 `-Pcadence.expectedSignerSha256=...`：严格使用该指纹，**跨签名来源也拦得住**；
  * - 未配置：回退为「与当前安装包同签名」。这仍能挡住"下载过程中被换成另一个包"，
  *   但挡不住本机已被替换成同包名异签名版本的情形——发布构建请务必配置上面的属性。
  */

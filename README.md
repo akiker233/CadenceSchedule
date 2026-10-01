@@ -199,7 +199,7 @@ NEXIO_KEYSTORE_FILE=/path/to/release.jks \
 NEXIO_KEYSTORE_PASSWORD=*** \
 NEXIO_KEY_ALIAS=*** \
 NEXIO_KEY_PASSWORD=*** \
-./gradlew :app:assembleRelease -Pnexio.expectedSignerSha256=<指纹>
+./gradlew :app:assembleRelease -Pcadence.expectedSignerSha256=<指纹>
 ```
 
 ### 教务索引内置文件
