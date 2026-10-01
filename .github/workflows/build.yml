@@ -231,6 +231,23 @@ jobs:
           fi
           echo "签名指纹对账通过"
 
+      - name: Prepare MIUI widget theme
+        id: mtz
+        run: |
+          SRC="mtzwidget/todaycourse/today_course.mtz"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::未找到 MIUI 主题包 $SRC（应由 mtzwidget/build_widget.ps1 生成并提交）"
+            exit 1
+          fi
+          # 附件名带上版本，避免用户下载到无法区分版本的 mtz
+          OUT="CadenceWidget-${{ steps.version.outputs.version }}.mtz"
+          cp "$SRC" "$OUT"
+          MTZ_SHA=$(sha256sum "$OUT" | awk '{print $1}')
+          echo "$MTZ_SHA  $OUT" > "$OUT.sha256"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "sha=$MTZ_SHA" >> "$GITHUB_OUTPUT"
+          ls -lh "$OUT"
+
       - name: Generate checksums
         run: |
           APK="${{ steps.apk.outputs.path }}"
@@ -242,8 +259,17 @@ jobs:
             echo "## 安装包校验"
             echo ""
             echo '```'
-            echo "SHA-256: $SHA"
+            echo "APK   SHA-256: $SHA"
+            echo "主题  SHA-256: ${{ steps.mtz.outputs.sha }}"
             echo '```'
+            echo ""
+            echo "## MIUI 桌面小组件（可选）"
+            echo ""
+            echo "附件 \`${{ steps.mtz.outputs.path }}\` 是 MIUI 主题小组件包，"
+            echo "需在主题商店/主题编辑器中安装后添加桌面小组件使用。"
+            echo ""
+            echo "> 若曾安装过旧版小组件主题，请**先卸载旧主题再安装**："
+            echo "> 应用包名已变更，旧主题无法读取课表数据。"
           } >> RELEASE_NOTE.md
 
       - name: Upload build artifact
@@ -253,6 +279,8 @@ jobs:
           path: |
             ${{ steps.apk.outputs.path }}
             ${{ steps.apk.outputs.path }}.sha256
+            ${{ steps.mtz.outputs.path }}
+            ${{ steps.mtz.outputs.path }}.sha256
           retention-days: 14
 
       - name: Publish GitHub Release
@@ -262,6 +290,8 @@ jobs:
           files: |
             ${{ steps.apk.outputs.path }}
             ${{ steps.apk.outputs.path }}.sha256
+            ${{ steps.mtz.outputs.path }}
+            ${{ steps.mtz.outputs.path }}.sha256
           body_path: RELEASE_NOTE.md
           name: "律动课表 v${{ steps.version.outputs.version }}"
         env:
