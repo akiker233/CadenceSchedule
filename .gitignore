@@ -20,6 +20,10 @@ Thumbs.db
 
 # --- 签名文件（敏感信息！） ---
 keystore/
+# 仅挡目录名不够：签名库若被放在别处（如 app/ 下）仍会被 add 进来
+*.jks
+*.keystore
+!debug.keystore
 
 # --- 部署相关（敏感：SSH 私钥） ---
 .deploy/
