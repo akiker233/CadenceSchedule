@@ -12,10 +12,6 @@ on:
   push:
     tags:
       - 'v*'
-    # 临时：仅用于在 ci-verify-workflow 分支上验证本流程；
-    # 合并到默认分支前必须删除，否则该分支每次推送都会跑一次构建。
-    branches:
-      - ci-verify-workflow
   workflow_dispatch:
 
 permissions:
