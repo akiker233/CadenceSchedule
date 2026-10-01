@@ -232,33 +232,59 @@ tasks.register<DefaultTask>("downloadEduIndex") {
     val minValidBytes = eduIndexMinValidBytes
     outputs.upToDateWhen { false } // 判定放在 doLast 内：已有合法索引即跳过网络
     doLast {
-        val url = "https://gitee.com/XingHeYuZhuan-gh/shiguang_warehouse/raw/index-pb-release/school_index.pb"
+        // 多镜像 + 重试：CI（GitHub Actions 位于境外）访问 Gitee raw CDN 并不稳定，
+        // 实测出现过 Read timed out 导致发布被硬失败拦下。
+        // 顺序上 GitHub 优先——在 Actions runner 上必然可达；Gitee 作为备用。
+        // （实测某段时间 Gitee 仓库整体不可达，而 GitHub 镜像正常。）
+        val urls = listOf(
+            "https://raw.githubusercontent.com/XingHeYuZhuan/shiguang_warehouse/index-pb-release/school_index.pb",
+            "https://gitee.com/XingHeYuZhuan-gh/shiguang_warehouse/raw/index-pb-release/school_index.pb",
+        )
         val beforeBytes = targetLocation.takeIf { it.isFile }?.length() ?: 0L
         var downloadSucceeded = false
         var failureReason: String? = null
 
         if (!EduIndexPolicy.isUsable(beforeBytes, minValidBytes)) {
-            try {
-                targetLocation.parentFile?.mkdirs()
-                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "okhttp/4.12.0")
-                    setRequestProperty("Accept", "*/*")
-                    connectTimeout = 15_000
-                    readTimeout = 30_000
-                }
-                val contentType = connection.contentType?.lowercase() ?: ""
-                if (contentType.contains("text/html")) {
-                    throw RuntimeException("gitee 返回了 HTML 页面（可能被反爬拦截）")
-                }
-                connection.inputStream.use { inbound ->
-                    targetLocation.outputStream().use { outbound ->
-                        inbound.copyTo(outbound)
+            targetLocation.parentFile?.mkdirs()
+            val attemptErrors = mutableListOf<String>()
+
+            outer@ for ((urlIndex, url) in urls.withIndex()) {
+                repeat(2) { attempt ->
+                    val tag = "镜像${urlIndex + 1} 第${attempt + 1}次"
+                    try {
+                        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                            instanceFollowRedirects = true
+                            setRequestProperty("User-Agent", "okhttp/4.12.0")
+                            setRequestProperty("Accept", "*/*")
+                            connectTimeout = 15_000
+                            readTimeout = 60_000
+                        }
+                        val contentType = connection.contentType?.lowercase() ?: ""
+                        if (contentType.contains("text/html")) {
+                            throw RuntimeException("返回了 HTML 页面（可能被反爬拦截）")
+                        }
+                        connection.inputStream.use { inbound ->
+                            targetLocation.outputStream().use { outbound ->
+                                inbound.copyTo(outbound)
+                            }
+                        }
+                        if (EduIndexPolicy.isUsable(targetLocation.length(), minValidBytes)) {
+                            println("[EduIndex] $tag 成功（${targetLocation.length() / 1024}KB）")
+                            downloadSucceeded = true
+                            break@outer
+                        }
+                        throw RuntimeException("响应过小（${targetLocation.length()}B）")
+                    } catch (e: Exception) {
+                        val reason = e.message ?: e.toString()
+                        attemptErrors += "$tag: $reason"
+                        println("[EduIndex] $tag 失败: $reason")
+                        // 间隔重试，给瞬时网络抖动留出恢复时间
+                        if (attempt == 0) Thread.sleep(2_000)
                     }
                 }
-                downloadSucceeded = true
-            } catch (e: Exception) {
-                failureReason = e.message ?: e.toString()
+            }
+            if (!downloadSucceeded) {
+                failureReason = attemptErrors.joinToString(" | ")
             }
         }
 
@@ -274,7 +300,7 @@ tasks.register<DefaultTask>("downloadEduIndex") {
                 throw GradleException(
                     "[EduIndex] 索引拉取失败且无可用的内置索引，Release 产物会缺失教务导入数据" +
                         "（首启进入教务导入只能看到空白学校列表）。" +
-                        "请检查网络或 Gitee 可达性后重试。原因: $failureReason",
+                        "已尝试 ${urls.size} 个镜像各 2 次。原因: $failureReason",
                 )
         }
     }
