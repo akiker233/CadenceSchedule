@@ -13,6 +13,7 @@ import com.cadence.schedule.ui.basic.CollapsibleTopAppBar
 import com.cadence.schedule.ui.basic.LiquidTopBarButton
 import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -45,6 +46,7 @@ class LocalBackupActivity : ComponentActivity() {
             }
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
 
             Scaffold(
                 topBar = {
@@ -81,7 +83,10 @@ class LocalBackupActivity : ComponentActivity() {
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize().then(
-                            Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                            Modifier.liquidGlassLayerBackdrop(
+                                backdrop = liquidGlassBackdrop,
+                                recordKey = liquidGlassRecordKey,
+                            )
                         )
                     ) {
                         LocalBackupScreen(

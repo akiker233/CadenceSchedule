@@ -76,6 +76,7 @@ import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
 import com.cadence.schedule.ui.data.changelogData
 import com.cadence.schedule.ui.effects.background.BgEffectBackground
 import com.cadence.schedule.ui.effects.miuix.rememberBlurBackdrop
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.theme.CourseScheduleTheme
 import com.cadence.schedule.ui.utils.CrashLogHelper
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
@@ -143,6 +144,7 @@ fun AboutScreen(
     val dialogGlass: Backdrop = dialogBackdrop ?: liquidGlassBackdrop
     val hapticFeedback = LocalHapticFeedback.current
     val scrollBehavior = rememberSharedScrollBehavior()
+    val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val isInDark = isAppDarkTheme()
@@ -284,7 +286,10 @@ fun AboutScreen(
                 .fillMaxSize()
                 .background(MiuixTheme.colorScheme.background)
                 .then(
-                    Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                    Modifier.liquidGlassLayerBackdrop(
+                        backdrop = liquidGlassBackdrop,
+                        recordKey = liquidGlassRecordKey,
+                    )
                 )
         ) {
             BgEffectBackground(

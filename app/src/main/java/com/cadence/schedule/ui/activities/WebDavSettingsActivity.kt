@@ -26,6 +26,7 @@ import com.cadence.schedule.ui.basic.LiquidGlassTextButton
 import com.cadence.schedule.ui.basic.LiquidTopBarButton
 import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -60,6 +61,7 @@ class WebDavSettingsActivity : ComponentActivity() {
             }
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
             val isTablet = LocalConfiguration.current.screenWidthDp >= 600
             val tabletHorizontalPadding = if (isTablet) {
                 val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -121,7 +123,10 @@ class WebDavSettingsActivity : ComponentActivity() {
                     // 采样层只包内容；玻璃按钮放在层外，避免循环采样
                     Box(
                         modifier = Modifier.fillMaxSize().then(
-                            Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                            Modifier.liquidGlassLayerBackdrop(
+                                backdrop = liquidGlassBackdrop,
+                                recordKey = liquidGlassRecordKey,
+                            )
                         )
                     ) {
                         WebDavSettingsScreen(

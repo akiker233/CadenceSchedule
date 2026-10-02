@@ -61,6 +61,7 @@ import com.cadence.schedule.ui.effects.motion.OobeCubicOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeFifthpowerOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuadraticOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuartOutEasing
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.blockTouchPassThrough
 import com.cadence.schedule.ui.utils.isAppDarkTheme
 import com.cadence.schedule.ui.utils.PredictiveBackSettings
@@ -352,6 +353,7 @@ fun CourseDetailScreen(
 
     val isDark = isAppDarkTheme()
     val scrollBehavior = rememberSharedScrollBehavior()
+    val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
 
     Box(
         modifier = Modifier
@@ -467,7 +469,8 @@ fun CourseDetailScreen(
                                 .fillMaxSize()
                                 .then(
                                     Modifier.liquidGlassLayerBackdrop(
-                                        liquidGlassBackdrop
+                                        backdrop = liquidGlassBackdrop,
+                                        recordKey = liquidGlassRecordKey,
                                     )
                                 )
                         ) {

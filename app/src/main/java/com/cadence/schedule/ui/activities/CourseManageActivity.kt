@@ -50,6 +50,7 @@ import com.cadence.schedule.ui.basic.ShortcutMenuItem
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
 import com.cadence.schedule.ui.effects.motion.OobeCubicOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuartOutEasing
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.screens.CourseEditScreen
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import com.cadence.schedule.viewmodel.CourseViewModel
@@ -104,6 +105,7 @@ class CourseManageActivity : ComponentActivity() {
             val editLiquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val shortcutMenuBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
             val courseViewModel: CourseViewModel = viewModel()
             val settingsViewModel: SettingsViewModel = viewModel()
             val sectionTimes by settingsViewModel.sectionTimes.collectAsState()
@@ -284,7 +286,10 @@ class CourseManageActivity : ComponentActivity() {
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize().then(
-                                        Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                                        Modifier.liquidGlassLayerBackdrop(
+                                            backdrop = liquidGlassBackdrop,
+                                            recordKey = liquidGlassRecordKey,
+                                        )
                                     )
                                 ) {
                                     CourseManageScreen(

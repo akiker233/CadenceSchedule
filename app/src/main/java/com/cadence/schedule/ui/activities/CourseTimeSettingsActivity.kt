@@ -39,6 +39,7 @@ import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
 import com.cadence.schedule.ui.effects.motion.OobeCubicOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuartOutEasing
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.screens.TimeConfigEditScreen
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import kotlinx.coroutines.delay
@@ -88,6 +89,7 @@ class CourseTimeSettingsActivity : ComponentActivity() {
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val editLiquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
             val repository = remember { CourseRepository(this@CourseTimeSettingsActivity) }
             val context = androidx.compose.ui.platform.LocalContext.current
             val activity = context as? CourseTimeSettingsActivity
@@ -222,7 +224,10 @@ class CourseTimeSettingsActivity : ComponentActivity() {
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize().then(
-                                        Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                                        Modifier.liquidGlassLayerBackdrop(
+                                            backdrop = liquidGlassBackdrop,
+                                            recordKey = liquidGlassRecordKey,
+                                        )
                                     )
                                 ) {
                                     CourseTimeSettingsScreen(

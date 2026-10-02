@@ -82,6 +82,7 @@ import com.cadence.schedule.ui.effects.motion.OobeCubicOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeFifthpowerOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuadraticOutEasing
 import com.cadence.schedule.ui.effects.motion.OobeQuartOutEasing
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.PredictiveBackSettings
 import com.cadence.schedule.ui.utils.isAppDarkTheme
 import com.cadence.schedule.ui.utils.overScrollVertical
@@ -236,6 +237,7 @@ fun TimeConfigEditScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollBehavior = rememberSharedScrollBehavior()
+    val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
     var listScrollY by remember { mutableIntStateOf(0) }
 
     val screenTitle = if (isFabCreation) "添加时间配置" else "编辑时间配置"
@@ -791,7 +793,8 @@ fun TimeConfigEditScreen(
                             .layerBackdrop(backdrop)
                             .then(
                                 if (isLiquidGlass) Modifier.liquidGlassLayerBackdrop(
-                                    liquidGlassBackdrop
+                                    backdrop = liquidGlassBackdrop,
+                                    recordKey = liquidGlassRecordKey,
                                 )
                                 else Modifier
                             )

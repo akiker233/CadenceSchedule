@@ -84,6 +84,7 @@ import com.cadence.schedule.ui.basic.collapsibleTopInset
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
 import com.cadence.schedule.ui.effects.edgelight.edgeLight
 import com.cadence.schedule.ui.effects.edgelight.rememberDefaultEdgeLight
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.theme.CourseScheduleTheme
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import com.cadence.schedule.ui.utils.buildShareScheduleMap
@@ -186,6 +187,7 @@ fun SwitchScheduleScreen(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val repository = remember { CourseRepository(context) }
     val scrollBehavior = rememberSharedScrollBehavior()
+    val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
     val hapticFeedback = androidx.compose.ui.platform.LocalHapticFeedback.current
     val screenGraphicsLayer = rememberGraphicsLayer()
     val scope = rememberCoroutineScope()
@@ -731,7 +733,10 @@ fun SwitchScheduleScreen(
                         }
                         drawContent()
                     }
-                    .liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                    .liquidGlassLayerBackdrop(
+                        backdrop = liquidGlassBackdrop,
+                        recordKey = liquidGlassRecordKey,
+                    )
             ) {
                 // 注意：这里不要再 collect firstVisibleItemScrollOffset 写 state ——
                 // 那会让整页在滚动时每像素重组一次（listScrollY 之前根本没被读取，纯属白烧）。

@@ -26,6 +26,7 @@ import com.cadence.schedule.ui.basic.LiquidGlassTextButton
 import com.cadence.schedule.ui.basic.LiquidTopBarButton
 import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import com.cadence.schedule.viewmodel.SettingsViewModel
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -64,6 +65,7 @@ class CourseReminderActivity : ComponentActivity() {
             }
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
             val isTablet = LocalConfiguration.current.screenWidthDp >= 600
             val tabletHorizontalPadding = if (isTablet) {
                 val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -106,7 +108,10 @@ class CourseReminderActivity : ComponentActivity() {
                     // 采样层只包内容；玻璃按钮必须放在层外，否则 drawBackdrop 会采到自己导致循环采样崩溃
                     Box(
                         modifier = Modifier.fillMaxSize().then(
-                            Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                            Modifier.liquidGlassLayerBackdrop(
+                                backdrop = liquidGlassBackdrop,
+                                recordKey = liquidGlassRecordKey,
+                            )
                         )
                     ) {
                         CourseReminderScreen(

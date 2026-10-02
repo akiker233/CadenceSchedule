@@ -16,6 +16,7 @@ import com.cadence.schedule.ui.basic.CollapsibleTopAppBar
 import com.cadence.schedule.ui.basic.LiquidTopBarButton
 import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import com.cadence.schedule.viewmodel.CourseViewModel
 import com.cadence.schedule.viewmodel.ScheduleViewModel
@@ -61,6 +62,7 @@ open class BackupAndMigrationActivity : ComponentActivity() {
             }
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
 
             val courseViewModel: CourseViewModel = viewModel()
             val scheduleViewModel: ScheduleViewModel = viewModel()
@@ -101,7 +103,10 @@ open class BackupAndMigrationActivity : ComponentActivity() {
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize().then(
-                            Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                            Modifier.liquidGlassLayerBackdrop(
+                                backdrop = liquidGlassBackdrop,
+                                recordKey = liquidGlassRecordKey,
+                            )
                         )
                     ) {
                         BackupAndMigrationScreen(

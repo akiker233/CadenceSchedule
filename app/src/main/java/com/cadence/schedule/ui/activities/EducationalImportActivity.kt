@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.cadence.schedule.data.CourseRepository
@@ -209,6 +210,7 @@ class EducationalImportActivity : ComponentActivity() {
         }
         val liquidGlassBackdrop: LayerBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
         val scrollBehavior = rememberSharedScrollBehavior()
+        val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
 
         var currentScreen by remember { mutableStateOf("selection") }
         var selectedSchool by remember { mutableStateOf<SchoolData?>(null) }
@@ -269,7 +271,10 @@ class EducationalImportActivity : ComponentActivity() {
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize().then(
-                                    Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                                    Modifier.liquidGlassLayerBackdrop(
+                                        backdrop = liquidGlassBackdrop,
+                                        recordKey = liquidGlassRecordKey,
+                                    )
                                 )
                             ) {
                                 SchoolSelectionScreen(

@@ -25,6 +25,7 @@ import com.cadence.schedule.ui.basic.CollapsibleTopAppBar
 import com.cadence.schedule.ui.basic.LiquidTopBarButton
 import com.cadence.schedule.ui.basic.ProgressiveBlurTopBar
 import com.cadence.schedule.ui.basic.rememberSharedScrollBehavior
+import com.cadence.schedule.ui.effects.rememberLiquidGlassRecordKey
 import com.cadence.schedule.ui.utils.applyThemeAwareSystemBars
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,6 +65,7 @@ class HolidaySettingsActivity : ComponentActivity() {
             }
             val liquidGlassBackdrop = com.kyant.backdrop.backdrops.rememberLayerBackdrop()
             val scrollBehavior = rememberSharedScrollBehavior()
+            val liquidGlassRecordKey = rememberLiquidGlassRecordKey(scrollBehavior)
             val currentDate = remember { LocalDate.now() }
             var year by remember { mutableIntStateOf(currentDate.year) }
             var entries by remember {
@@ -168,7 +170,10 @@ class HolidaySettingsActivity : ComponentActivity() {
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize().then(
-                            Modifier.liquidGlassLayerBackdrop(liquidGlassBackdrop)
+                            Modifier.liquidGlassLayerBackdrop(
+                                backdrop = liquidGlassBackdrop,
+                                recordKey = liquidGlassRecordKey,
+                            )
                         )
                     ) {
                         HolidaySettingsScreen(
