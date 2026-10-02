@@ -25,6 +25,13 @@ object HolidayManager {
     private const val BACKUP_SCHEMA_VERSION_KEY = "schema_version"
     private val _dataRevision = MutableStateFlow(0L)
     val dataRevision = _dataRevision.asStateFlow()
+
+    /**
+     * [loadAllByYear] 的解析结果缓存，配合 [cachedVersion]（KV 版本号）做失效判断。
+     * 仅在 [loadAllByYear]（@Synchronized）内读写。
+     */
+    private var entriesByYearCache: Map<Int, List<Entry>>? = null
+    private var cachedVersion: Long = Long.MIN_VALUE
     const val TYPE_HOLIDAY = 0
     const val TYPE_WORKSWAP = 1
 
@@ -42,16 +49,37 @@ object HolidayManager {
         val followWeekday: Int = -1,
         val custom: Boolean = false,
     ) {
-        fun matches(target: String): Boolean {
-            val targetDate = runCatching { LocalDate.parse(target) }.getOrNull() ?: return false
-            val startDate = runCatching { LocalDate.parse(date) }.getOrNull() ?: return false
-            val lastDate = if (endDate.isBlank()) {
-                startDate
-            } else {
-                runCatching { LocalDate.parse(endDate) }.getOrNull() ?: return false
-            }
-            return !targetDate.isBefore(startDate) && !targetDate.isAfter(lastDate)
-        }
+        fun matches(target: String): Boolean = matches(runCatching { LocalDate.parse(target) }.getOrNull())
+
+    /**
+     * 与 [matches] 等价，但由调用方传入已解析的日期。
+     *
+     * 之所以要这个重载：`entriesForDate` 会在 filter 里对每条记录调用一次，
+     * 而课表网格绘制会触发大量此类调用。原先每次都要 `LocalDate.parse` 三个字符串
+     * （且用 runCatching 承担异常开销），一次滚动下来是上千次重复解析。
+     * 调用方只要把目标日期解析一次即可。
+     */
+    fun matches(targetDate: LocalDate?): Boolean {
+        if (targetDate == null) return false
+        val startDate = parsedStartDate ?: return false
+        val lastDate = parsedEndDate ?: return false
+        return !targetDate.isBefore(startDate) && !targetDate.isAfter(lastDate)
+    }
+
+    /**
+     * date/endDate 的解析结果缓存。
+     *
+     * 这两个字段是构造后不变的（data class 的 val），而解析结果被 matches 高频读取，
+     * 因此按实例惰性缓存。注意：不能放进主构造函数，否则会改变 Gson 序列化字段与 equals 语义。
+     */
+    private val parsedStartDate: LocalDate? by lazy(LazyThreadSafetyMode.NONE) {
+        runCatching { LocalDate.parse(date) }.getOrNull()
+    }
+
+    private val parsedEndDate: LocalDate? by lazy(LazyThreadSafetyMode.NONE) {
+        if (endDate.isBlank()) parsedStartDate
+        else runCatching { LocalDate.parse(endDate) }.getOrNull()
+    }
 
         fun toJson() = JSONObject().apply {
             put("date", date); put("endDate", endDate); put("name", name); put("type", type)
@@ -79,12 +107,33 @@ object HolidayManager {
             }
         }
 
-    /** Loads all years with saved holiday entries, retaining the storage year for schedule lookup. */
+    /**
+     * 全部年份的假期/调休记录，按 KV 版本号缓存。
+     *
+     * 原先每次调用都要 `preferences.all`（全量快照）+ 按年 `JSONArray` 解析 + 逐条构造 Entry。
+     * 而它在渲染路径上被高频调用：
+     *   hasDisplayableCoursesOnDay / hasWorkSwapOnDay → workSwapEntryOnDay → workSwap → 这里
+     * 以及今日页倒计时快照（remember key 含随秒变化的值）→ 这里。
+     * 结果是每次滚动、每次倒计时跳动都重新解析一遍全部假期 JSON。
+     *
+     * KEY_VERSION 在每次写入时都会递增（maxOf(now, prev+1)），因此可作为可靠的失效键：
+     * 版本未变即数据未变，直接复用已解析结果。
+     *
+     * 注意：返回的 Map 是共享实例，调用方**只读**，不要修改。
+     */
     @Synchronized
     fun loadAllByYear(context: Context): Map<Int, List<Entry>> {
+        val version = getVersion(context)
+        val cached = entriesByYearCache
+        if (cached != null && cachedVersion == version) return cached
+
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val years = storedEntryYears(preferences.all.keys)
-        return years.associateWith { load(context, it) }
+        val loaded = years.associateWith { load(context, it) }
+
+        entriesByYearCache = loaded
+        cachedVersion = version
+        return loaded
     }
 
     /** Preserve each year's stored JSON, including custom mappings and cross-year ranges. */
@@ -260,9 +309,12 @@ object HolidayManager {
         }.distinct()
 
         val yearRank = storageYearPriority.withIndex().associate { it.value to it.index }
+        // 目标日期只解析一次：此前对每条记录都传 date.toString()，由 Entry.matches 重新解析，
+        // 在渲染路径上会放大成大量重复解析。
+        val target = date
         return storageYearPriority.flatMap { year ->
             entriesByYear[year].orEmpty()
-                .filter { it.matches(date.toString()) }
+                .filter { it.matches(target) }
                 .map { year to it }
         }.sortedWith(
             compareByDescending<Pair<Int, Entry>> { it.second.custom }
@@ -474,12 +526,17 @@ object HolidayManager {
     }
 
     fun isHoliday(context: Context, date: LocalDate): Boolean {
+        // 原先这里无条件拼接日志字符串。该函数在渲染路径上被高频调用，
+        // 即使 Logcat 正在丢弃 debug 日志，字符串拼接与格式化依然会发生。
+        // isLoggable 判断本身极廉价，可避免这笔无谓开销。
         val hit = entriesForDate(loadAllByYear(context), date)
             .firstOrNull { it.type == TYPE_HOLIDAY }
-        android.util.Log.d(
-            "CourseReminder",
-            "isHoliday: date=$date hit=${hit?.name ?: "none"} date=${hit?.date ?: "-"} end=${hit?.endDate ?: "-"}"
-        )
+        if (android.util.Log.isLoggable("CourseReminder", android.util.Log.DEBUG)) {
+            android.util.Log.d(
+                "CourseReminder",
+                "isHoliday: date=$date hit=${hit?.name ?: "none"} date=${hit?.date ?: "-"} end=${hit?.endDate ?: "-"}"
+            )
+        }
         return hit != null
     }
 
